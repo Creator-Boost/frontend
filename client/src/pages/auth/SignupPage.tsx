@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, TrendingUp, Users, Briefcase } from 'lucide-react';
-import { useUser } from '../context/UserContext';
+import { useUser } from '../../context/UserContext';
 
 const SignupPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);

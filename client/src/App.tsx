@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import SignupPage from './pages/SignupPage';
+import LoginPage from './pages/auth/LoginPage';
+import SignupPage from './pages/auth/SignupPage';
 import ServicesPage from './pages/ServicesPage';
 import ExpertDashboard from './pages/ExpertDashboard';
 import ClientDashboard from './pages/ClientDashboard';
