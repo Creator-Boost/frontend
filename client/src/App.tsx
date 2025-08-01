@@ -1,5 +1,6 @@
 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from "react-hot-toast";
 import Header from './components/Header';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
@@ -11,6 +12,9 @@ import ProfilePage from './pages/ProfilePage';
 import MessagesPage from './pages/MessagesPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
 import { UserProvider } from './context/UserContext';
+import EmailVerificationPage from './pages/auth/EmailVerificationPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 
 function App() {
   return (
@@ -28,7 +32,13 @@ function App() {
             <Route path="/profile/:id" element={<ProfilePage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/service/:id" element={<ServiceDetailPage />} />
+            <Route path="/verify-email" element={<EmailVerificationPage />} />
+            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+
           </Routes>
+           <Toaster />
         </div>
       </Router>
     </UserProvider>

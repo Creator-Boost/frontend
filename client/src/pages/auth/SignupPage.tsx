@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, TrendingUp, Users, Briefcase } from 'lucide-react';
-import { useUser } from '../../context/UserContext';
+import { useAuthStore } from '../../context/store/authStore';
+import toast from 'react-hot-toast';
+
 
 const SignupPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -13,10 +15,10 @@ const SignupPage: React.FC = () => {
     password: '',
     confirmPassword: ''
   });
-  const { setUser } = useUser();
+  
   const navigate = useNavigate();
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const { register, error, isLoading, message } = useAuthStore();
+  /*const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate signup
     const newUser = {
@@ -30,7 +32,30 @@ const SignupPage: React.FC = () => {
     };
     setUser(newUser);
     navigate(userType === 'expert' ? '/expert-dashboard' : '/client-dashboard');
-  };
+  };*/
+  const handleSignUp = async (e: React.FormEvent) => {
+  
+    e.preventDefault();
+    const { email, password, confirmPassword, firstName, lastName } = formData;
+    const name = `${firstName} ${lastName}`;
+
+    if (password !== confirmPassword) {
+		console.log("Passwords do not match");
+    toast.error("Passwords do not match");
+		return;
+	}
+
+		try {
+			await register(email, password, name);
+      toast.success("Registration successful! Please verify your email.");
+      
+			navigate("/login");
+		} catch (error) {
+      console.error('Registration error:', error);
+      toast.error("Registration failed. Please try again.");
+      
+		}
+	};
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -58,8 +83,25 @@ const SignupPage: React.FC = () => {
         </p>
       </div>
 
+
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+
+
+          {/* Display error message if any */}
+          {error && (
+            <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+          
+          {/* Display success message if any */}
+          {message && (
+            <div className="mb-4 p-2 bg-green-100 border border-green-400 text-green-700 rounded">
+              {message}
+            </div>
+          )}
+
           {/* User Type Selection */}
           <div className="mb-6">
             <label className="text-base font-medium text-gray-900">I want to:</label>
@@ -99,7 +141,7 @@ const SignupPage: React.FC = () => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSignUp} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
@@ -220,9 +262,12 @@ const SignupPage: React.FC = () => {
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                disabled={isLoading}
+                className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                  isLoading ? "bg-emerald-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500`}
               >
-                Create Account
+                {isLoading ? "Creating..." : "Create Account"}
               </button>
             </div>
           </form>

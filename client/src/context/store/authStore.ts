@@ -1,19 +1,28 @@
 import { create } from "zustand";
 import axios, { AxiosError } from "axios";
 
-const API_URL =
-	import.meta.env.MODE === "development"
-		? "http://localhost:8081/api/auth"
-		: "/api/auth";
+const API_URL ="http://localhost:8081/api/v1";
+
 
 axios.defaults.withCredentials = true;
 
 // Interfaces
 interface User {
-	id: string;
+	
 	email: string;
 	name: string;
-	// Add other user fields if available
+}
+
+interface ProfileResponse {
+	email: string;
+	name: string;
+	accountVerified: boolean;
+
+}
+
+interface AuthResponse {
+	email: string;
+	jwt: string;
 }
 
 interface AuthState {
@@ -23,14 +32,16 @@ interface AuthState {
 	isLoading: boolean;
 	isCheckingAuth: boolean;
 	message: string | null;
+	
 
-	signup: (email: string, password: string, name: string) => Promise<void>;
-	login: (email: string, password: string) => Promise<void>;
+	register: (email: string, password: string, name: string) => Promise<void>;
+	login: (email: string, password: string) => Promise<ProfileResponse>;
 	logout: () => Promise<void>;
-	verifyEmail: (code: string) => Promise<{ user: User }>;
+	sendVerifyOtp: () => Promise<void>;
+	verifyOtp: (otp: string) => Promise<void>;
 	checkAuth: () => Promise<void>;
 	forgotPassword: (email: string) => Promise<void>;
-	resetPassword: (token: string, password: string) => Promise<void>;
+	resetPassword: (resetOtp: string, newPassword: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -40,16 +51,22 @@ export const useAuthStore = create<AuthState>((set) => ({
 	isLoading: false,
 	isCheckingAuth: true,
 	message: null,
+	isVerified: false,
 
-	signup: async (email, password, name) => {
+	register: async (email, password, name) => {
 		set({ isLoading: true, error: null });
 		try {
-			const response = await axios.post<{ user: User }>(`${API_URL}/signup`, {
+			const response = await axios.post<ProfileResponse>(`${API_URL}/register`, {
 				email,
 				password,
 				name,
 			});
-			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+			set({ 
+				user: { email: response.data.email, name: response.data.name }, 
+				isAuthenticated: false, 
+				isLoading: false,
+				message: "Registration successful! Please verify your email."
+			});
 		} catch (error) {
             const axiosError = error as AxiosError<{ message: string }>;
 			set({
@@ -63,17 +80,24 @@ export const useAuthStore = create<AuthState>((set) => ({
 	login: async (email, password) => {
 		set({ isLoading: true, error: null });
 		try {
-			const response = await axios.post<{ user: User }>(`${API_URL}/login`, {
+			await axios.post<AuthResponse>(`${API_URL}/login`, {
 				email,
 				password,
 			});
+
+			// After successful login, get the user profile
+			const profileResponse = await axios.get<ProfileResponse>(`${API_URL}/profile`);
+
 			set({
 				isAuthenticated: true,
-				user: response.data.user,
+				user: { email: profileResponse.data.email, name: profileResponse.data.name },
 				error: null,
 				isLoading: false,
+				
 			});
-		} catch (error: any) {
+			return profileResponse.data;
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
 			set({
                 
 				error: error.response?.data?.message || "Error logging in",
@@ -88,23 +112,42 @@ export const useAuthStore = create<AuthState>((set) => ({
 		try {
 			await axios.post(`${API_URL}/logout`);
 			set({ user: null, isAuthenticated: false, error: null, isLoading: false });
-		} catch (error: any) {
+		} catch (error) {
 			set({ error: "Error logging out", isLoading: false });
 			throw error;
 		}
 	},
 
-	verifyEmail: async (code) => {
+	sendVerifyOtp: async () => {
 		set({ isLoading: true, error: null });
 		try {
-			const response = await axios.post<{ user: User }>(`${API_URL}/verify-email`, {
-				code,
+			await axios.post(`${API_URL}/send-otp`);
+			set({ 
+				isLoading: false,
+				message: "OTP sent to your email"
 			});
-			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
-			return response.data;
-		} catch (error: any) {
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
 			set({
-				error: error.response?.data?.message || "Error verifying email",
+				error: error.response?.data?.message || "Error sending OTP",
+				isLoading: false,
+			});
+			throw error;
+		}
+	},
+
+	verifyOtp: async (otp: string) => {
+		set({ isLoading: true, error: null });
+		try {
+			await axios.post(`${API_URL}/verify-otp`, { otp });
+			set({ 
+				isLoading: false,
+				message: "Email verified successfully"
+			});
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
+			set({
+				error: error.response?.data?.message || "Invalid OTP",
 				isLoading: false,
 			});
 			throw error;
@@ -114,48 +157,88 @@ export const useAuthStore = create<AuthState>((set) => ({
 	checkAuth: async () => {
 		set({ isCheckingAuth: true, error: null });
 		try {
-			const response = await axios.get<{ user: User }>(`${API_URL}/check-auth`);
-			set({
-				user: response.data.user,
-				isAuthenticated: true,
-				isCheckingAuth: false,
+			const response = await axios.get<boolean>(`${API_URL}/is-authenticated`);
+			
+			if (response.data) {
+				// If authenticated, get the user profile
+				const profileResponse = await axios.get<ProfileResponse>(`${API_URL}/profile`);
+				set({
+					user: { email: profileResponse.data.email, name: profileResponse.data.name },
+					isAuthenticated: true,
+					isCheckingAuth: false,
+				});
+			} else {
+				set({ 
+					user: null,
+					isAuthenticated: false,
+					isCheckingAuth: false 
+				});
+			}
+		} catch {
+			set({ 
+				error: null, 
+				isCheckingAuth: false, 
+				isAuthenticated: false,
+				user: null
 			});
-		} catch (error) {
-			set({ error: null, isCheckingAuth: false, isAuthenticated: false });
 		}
 	},
 
-	forgotPassword: async (email) => {
+	getProfile: async () => {
 		set({ isLoading: true, error: null });
 		try {
-			const response = await axios.post<{ message: string }>(
-				`${API_URL}/forgot-password`,
-				{ email }
-			);
-			set({ message: response.data.message, isLoading: false });
-		} catch (error: any) {
+			const response = await axios.get<ProfileResponse>(`${API_URL}/profile`);
 			set({
+				user: { email: response.data.email, name: response.data.name },
 				isLoading: false,
-				error: error.response?.data?.message || "Error sending reset password email",
+			});
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
+			set({
+				error: error.response?.data?.message || "Error fetching profile",
+				isLoading: false,
 			});
 			throw error;
 		}
 	},
 
-	resetPassword: async (token, password) => {
+	forgotPassword: async (email: string) => {
 		set({ isLoading: true, error: null });
 		try {
-			const response = await axios.post<{ message: string }>(
-				`${API_URL}/reset-password/${token}`,
-				{ password }
-			);
-			set({ message: response.data.message, isLoading: false });
-		} catch (error: any) {
+			// Note: Your backend endpoint expects email as a query parameter
+			await axios.post(`${API_URL}/send-reset-otp?email=${encodeURIComponent(email)}`);
+			set({ 
+				message: "Reset OTP sent to your email",
+				isLoading: false 
+			});
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
+			set({
+				isLoading: false,
+				error: error.response?.data?.message || "Error sending reset OTP",
+			});
+			throw error;
+		}
+	},
+
+	resetPassword: async ( resetOtp: string, newPassword: string) => {
+		set({ isLoading: true, error: null });
+		try {
+			await axios.post(`${API_URL}/reset-password`, {
+				resetOtp,
+				newPassword,
+			});
+			set({ 
+				message: "Password reset successful",
+				isLoading: false 
+			});
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
 			set({
 				isLoading: false,
 				error: error.response?.data?.message || "Error resetting password",
 			});
 			throw error;
 		}
-	},
+	}
 }));
