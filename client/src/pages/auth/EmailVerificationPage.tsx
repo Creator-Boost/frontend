@@ -56,15 +56,10 @@ const EmailVerificationPage = () => {
     }
     const verificationCode = code.join("");
     try {
-      const userData = await verifyOtp(verificationCode);
+      await verifyOtp(verificationCode);
 	  toast.success("Email verified successfully");
-      switch (userData.role) {
-			case "CLIENT": return navigate("/client-dashboard");
-			case "PROVIDER": return navigate("/expert-dashboard");
-			case "ADMIN": return navigate("/admin");
-			default: return navigate("/");
-		}
-      
+      navigate("/");
+
     } catch (error) {
       toast.error("Error verifying email");
       console.log(error);

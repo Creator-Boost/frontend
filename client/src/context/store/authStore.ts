@@ -11,7 +11,9 @@ interface User {
 	
 	email: string;
 	name: string;
-	
+	userId : string;
+	role : string;
+
 }
 
 interface ProfileResponse {
@@ -19,6 +21,7 @@ interface ProfileResponse {
 	name: string;
 	role: string;
 	accountVerified: boolean;
+	userId: string;
 
 }
 
@@ -65,7 +68,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 				role
 			});
 			set({ 
-				user: { email: response.data.email, name: response.data.name  }, 
+				user: { email: response.data.email, name: response.data.name, userId: response.data.userId, role: response.data.role }, 
 				isAuthenticated: false, 
 				isLoading: false,
 				message: "Registration successful! Please verify your email."
@@ -93,7 +96,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 			set({
 				isAuthenticated: true,
-				user: { email: profileResponse.data.email, name: profileResponse.data.name },
+				user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role },
 				error: null,
 				isLoading: false,
 				
@@ -151,7 +154,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 			set({
 				isAuthenticated: true,
-				user: { email: profileResponse.data.email, name: profileResponse.data.name },
+				user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role },
 				error: null,
 				isLoading: false,
 				
@@ -176,7 +179,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 				// If authenticated, get the user profile
 				const profileResponse = await axios.get<ProfileResponse>(`${API_URL}/profile`);
 				set({
-					user: { email: profileResponse.data.email, name: profileResponse.data.name },
+					user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role },
 					isAuthenticated: true,
 					isCheckingAuth: false,
 				});
@@ -202,7 +205,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 		try {
 			const response = await axios.get<ProfileResponse>(`${API_URL}/profile`);
 			set({
-				user: { email: response.data.email, name: response.data.name },
+				user: { email: response.data.email, name: response.data.name, userId: response.data.userId, role: response.data.role },
 				isLoading: false,
 			});
 		} catch (err: unknown) {

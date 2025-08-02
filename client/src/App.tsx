@@ -6,8 +6,8 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
 import ServicesPage from './pages/ServicesPage';
-import ExpertDashboard from './pages/ExpertDashboard';
-import ClientDashboard from './pages/ClientDashboard';
+import ExpertDashboard from './pages/dashboard/ExpertDashboard';
+import ClientDashboard from './pages/dashboard/ClientDashboard';
 import ProfilePage from './pages/ProfilePage';
 import MessagesPage from './pages/MessagesPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
@@ -15,8 +15,21 @@ import { UserProvider } from './context/UserContext';
 import EmailVerificationPage from './pages/auth/EmailVerificationPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import { useAuthStore } from './context/store/authStore';
+import { useEffect, useState } from 'react';
+import LoadingScreen from './components/LoadingPage';
 
 function App() {
+  const { isCheckingAuth, checkAuth } = useAuthStore();
+  const [isAnimationDone, setIsAnimationDone] = useState(false);
+
+  useEffect(() => {
+    checkAuth();
+    const timer = setTimeout(() => setIsAnimationDone(true), 1200);
+    return () => clearTimeout(timer);
+  }, [checkAuth]);
+
+  if (isCheckingAuth || !isAnimationDone) return <LoadingScreen />;
   return (
     <UserProvider>
       <Router>
