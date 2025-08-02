@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, TrendingUp } from 'lucide-react';
-import { useUser } from '../context/UserContext';
+import { Eye, EyeOff, TrendingUp,Loader } from 'lucide-react';
+import { useAuthStore } from '../../context/store/authStore';
+import toast from 'react-hot-toast';
 
 const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -9,10 +10,10 @@ const LoginPage: React.FC = () => {
     email: '',
     password: ''
   });
-  const { setUser } = useUser();
+  const { login,sendVerifyOtp, error, isLoading, message } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  /*const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Simulate login
     const mockUser = {
@@ -26,7 +27,36 @@ const LoginPage: React.FC = () => {
     };
     setUser(mockUser);
     navigate('/');
-  };
+  };*/
+
+  const handleSignUp = async (e: React.FormEvent) => {
+  
+    e.preventDefault();
+    const { email, password } = formData;
+    if (!email || !password) {
+      toast.error("Email and password are required");
+      return;
+    }
+    
+    try {
+      const userData = await login(email, password);
+      if (!userData.accountVerified) {
+        // If not verified, send OTP and navigate to verification page
+        await sendVerifyOtp();
+        toast.success("Please verify your email. OTP sent to your email address.");
+        navigate("/verify-email"); // Navigate to your email verification page
+      } else {
+        // If verified, navigate to home
+        toast.success("Login successful!");
+        navigate("/");
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error("Login failed. Please check your credentials.");
+    }
+
+    
+	};
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -56,7 +86,7 @@ const LoginPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSignUp} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -118,10 +148,12 @@ const LoginPage: React.FC = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-emerald-600 hover:text-emerald-500">
+                <Link to="/forgot-password" className="font-medium text-emerald-600 hover:text-emerald-500">
                   Forgot your password?
-                </a>
+                </Link>
               </div>
+              {error && <p className='text-red-500 font-semibold mb-2'>{error}</p>}
+              {message && <p className='text-green-500 font-semibold mb-2'>{message}</p>}
             </div>
 
             <div>
@@ -129,7 +161,7 @@ const LoginPage: React.FC = () => {
                 type="submit"
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
               >
-                Sign in
+                {isLoading ? <Loader className='w-6 h-6 animate-spin mx-auto' /> : "Login"}
               </button>
             </div>
           </form>
