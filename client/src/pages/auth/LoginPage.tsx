@@ -40,7 +40,7 @@ const LoginPage: React.FC = () => {
     
     try {
       const userData = await login(email, password);
-      toast.success("Login successful!");
+      
       if (!userData.accountVerified) {
         // If not verified, send OTP and navigate to verification page
         await sendVerifyOtp();
@@ -49,12 +49,9 @@ const LoginPage: React.FC = () => {
       } else {
       
       
-        switch (userData.role) {
-          case "CLIENT": return navigate("/client-dashboard");
-          case "PROVIDER": return navigate("/expert-dashboard");
-          case "ADMIN": return navigate("/admin");
-          default: return navigate("/");
-        }
+        // If verified, navigate to the home page or dashboard
+        navigate("/");
+        toast.success("Login successful!");
       
     }
       

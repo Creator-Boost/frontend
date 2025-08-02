@@ -1,14 +1,16 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, MessageCircle, User, Menu, TrendingUp } from 'lucide-react';
-import { useUser } from '../context/UserContext';
+import { Search, MessageCircle } from 'lucide-react';
+import { useAuthStore } from '../context/store/authStore';
 
 const Header: React.FC = () => {
-  const { user, isAuthenticated, setUser } = useUser();
+  const {user,isAuthenticated,logout } = useAuthStore();
+  console.log("user", user);
+  console.log("isAuthenticated", isAuthenticated);
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
   };
 
@@ -17,12 +19,10 @@ const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="bg-emerald-500 p-2 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900">SocialBoost</span>
-          </Link>
+          <button onClick={() => navigate("/")} className="flex items-center  ">
+                <span className=" text-black text-2xl tracking-wide font-bold">Creator</span>
+                <span className=" text-emerald-500 text-2xl  font-bold">Boost</span>
+          </button>
 
           {/* Search Bar */}
           <div className="hidden md:flex flex-1 max-w-lg mx-8">
@@ -55,7 +55,7 @@ const Header: React.FC = () => {
                 <div className="relative group">
                   <button className="flex items-center space-x-2 text-gray-700 hover:text-emerald-600 p-2 rounded-md">
                     <img
-                      src={user?.avatar || `https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400`}
+                      src={ `https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400`}
                       alt="Profile"
                       className="h-8 w-8 rounded-full"
                     />
@@ -63,13 +63,13 @@ const Header: React.FC = () => {
                   </button>
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                     <Link
-                      to={user?.userType === 'expert' ? '/expert-dashboard' : '/client-dashboard'}
+                      to={user?.role === 'PROVIDER' ? '/expert-dashboard' : '/client-dashboard'}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       Dashboard
                     </Link>
                     <Link
-                      to={`/profile/${user?.id}`}
+                      to={`/profile/${user?.userId}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
                       Profile
