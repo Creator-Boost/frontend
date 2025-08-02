@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, TrendingUp,Loader } from 'lucide-react';
+import { Eye, EyeOff,Loader } from 'lucide-react';
 import { useAuthStore } from '../../context/store/authStore';
 import toast from 'react-hot-toast';
 
@@ -40,16 +40,24 @@ const LoginPage: React.FC = () => {
     
     try {
       const userData = await login(email, password);
+      toast.success("Login successful!");
       if (!userData.accountVerified) {
         // If not verified, send OTP and navigate to verification page
         await sendVerifyOtp();
         toast.success("Please verify your email. OTP sent to your email address.");
         navigate("/verify-email"); // Navigate to your email verification page
       } else {
-        // If verified, navigate to home
-        toast.success("Login successful!");
-        navigate("/");
-      }
+      
+      
+        switch (userData.role) {
+          case "CLIENT": return navigate("/client-dashboard");
+          case "PROVIDER": return navigate("/expert-dashboard");
+          case "ADMIN": return navigate("/admin");
+          default: return navigate("/");
+        }
+      
+    }
+      
     } catch (error) {
       console.error('Login error:', error);
       toast.error("Login failed. Please check your credentials.");
@@ -68,12 +76,8 @@ const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="bg-emerald-500 p-3 rounded-lg">
-            <TrendingUp className="h-8 w-8 text-white" />
-          </div>
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+        
+        <h2 className="mt-2 text-center text-3xl font-bold text-gray-900">
           Sign in to your account
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
