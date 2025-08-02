@@ -6,6 +6,7 @@ import WhyChooseUs from '../components/sections/WhyChooseUs';
 import StatsSection from '../components/sections/StatsSection';
 import HeroSection from '../components/sections/HeroSection';
 import PlatformsScrollingSection from '../components/sections/PlatformsScrollingSection';
+import Footer from '../components/footer';
 
 
 const HomePage: React.FC = () => {
@@ -72,31 +73,9 @@ const HomePage: React.FC = () => {
       {/* Stats Section */}
       <StatsSection />
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-            Ready to Boost Your Social Media?
-          </h2>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Join thousands of creators and businesses who are already growing their social media presence with expert help.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/signup"
-              className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-colors"
-            >
-              Get Started Today
-            </Link>
-            <Link
-              to="/services"
-              className="border-2 border-white text-white hover:bg-white hover:text-gray-900 px-8 py-4 rounded-lg text-lg font-semibold transition-colors"
-            >
-              Browse Services
-            </Link>
-          </div>
-        </div>
-      </section>
+      <Footer />
+
+     
     </div>
   );
 };
