@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, TrendingUp, Users, Briefcase } from 'lucide-react';
+import { Eye, EyeOff,  Users, Briefcase } from 'lucide-react';
 import { useAuthStore } from '../../context/store/authStore';
 import toast from 'react-hot-toast';
 
@@ -38,6 +38,7 @@ const SignupPage: React.FC = () => {
     e.preventDefault();
     const { email, password, confirmPassword, firstName, lastName } = formData;
     const name = `${firstName} ${lastName}`;
+    const role = userType === 'expert' ? 'PROVIDER' : 'CLIENT';
 
     if (password !== confirmPassword) {
 		console.log("Passwords do not match");
@@ -46,7 +47,7 @@ const SignupPage: React.FC = () => {
 	}
 
 		try {
-			await register(email, password, name);
+			await register(email, password, name, role);
       toast.success("Registration successful! Please verify your email.");
       
 			navigate("/login");
@@ -67,12 +68,8 @@ const SignupPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-          <div className="bg-emerald-500 p-3 rounded-lg">
-            <TrendingUp className="h-8 w-8 text-white" />
-          </div>
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+        
+        <h2 className="mt-2 text-center text-3xl font-bold text-gray-900">
           Join SocialBoost
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">

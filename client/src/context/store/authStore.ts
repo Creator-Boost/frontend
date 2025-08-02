@@ -11,11 +11,13 @@ interface User {
 	
 	email: string;
 	name: string;
+	
 }
 
 interface ProfileResponse {
 	email: string;
 	name: string;
+	role: string;
 	accountVerified: boolean;
 
 }
@@ -34,11 +36,11 @@ interface AuthState {
 	message: string | null;
 	
 
-	register: (email: string, password: string, name: string) => Promise<void>;
+	register: (email: string, password: string, name: string, role: string) => Promise<void>;
 	login: (email: string, password: string) => Promise<ProfileResponse>;
 	logout: () => Promise<void>;
 	sendVerifyOtp: () => Promise<void>;
-	verifyOtp: (otp: string) => Promise<void>;
+	verifyOtp: (otp: string) => Promise<ProfileResponse>;
 	checkAuth: () => Promise<void>;
 	forgotPassword: (email: string) => Promise<void>;
 	resetPassword: (resetOtp: string, newPassword: string) => Promise<void>;
@@ -53,16 +55,17 @@ export const useAuthStore = create<AuthState>((set) => ({
 	message: null,
 	isVerified: false,
 
-	register: async (email, password, name) => {
+	register: async (email, password, name, role) => {
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post<ProfileResponse>(`${API_URL}/register`, {
 				email,
 				password,
 				name,
+				role
 			});
 			set({ 
-				user: { email: response.data.email, name: response.data.name }, 
+				user: { email: response.data.email, name: response.data.name  }, 
 				isAuthenticated: false, 
 				isLoading: false,
 				message: "Registration successful! Please verify your email."
@@ -144,6 +147,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 				isLoading: false,
 				message: "Email verified successfully"
 			});
+			const profileResponse = await axios.get<ProfileResponse>(`${API_URL}/profile`);
+
+			set({
+				isAuthenticated: true,
+				user: { email: profileResponse.data.email, name: profileResponse.data.name },
+				error: null,
+				isLoading: false,
+				
+			});
+			return profileResponse.data;
 		} catch (err: unknown) {
 			const error = err as AxiosError<{ message: string }>;
 			set({

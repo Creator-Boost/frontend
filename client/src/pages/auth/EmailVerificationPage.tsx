@@ -9,7 +9,7 @@ const EmailVerificationPage = () => {
 	const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 	const navigate = useNavigate();
 
-	const { error, isLoading, verifyOtp, message } = useAuthStore();
+	const { error, isLoading, verifyOtp} = useAuthStore();
 
 	const handleChange = (index: number, value: string) => {
 		const newCode = [...code];
@@ -56,14 +56,21 @@ const EmailVerificationPage = () => {
     }
     const verificationCode = code.join("");
     try {
-      await verifyOtp(verificationCode);
-      navigate("/");
-      toast.success("Email verified successfully");
+      const userData = await verifyOtp(verificationCode);
+	  toast.success("Email verified successfully");
+      switch (userData.role) {
+			case "CLIENT": return navigate("/client-dashboard");
+			case "PROVIDER": return navigate("/expert-dashboard");
+			case "ADMIN": return navigate("/admin");
+			default: return navigate("/");
+		}
+      
     } catch (error) {
-      toast.error(message || "Error verifying email");
+      toast.error("Error verifying email");
       console.log(error);
     }
-  }, [code, verifyOtp, navigate, message]);
+	
+  }, [code, verifyOtp, navigate]);
 
   // Auto submit when all fields are filled
   useEffect(() => {
