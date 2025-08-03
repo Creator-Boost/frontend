@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Clock, CheckCircle, AlertCircle, MessageCircle } from 'lucide-react';
+import { Plus, Search, Clock, CheckCircle, MessageCircle } from 'lucide-react';
 
 const ClientDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
