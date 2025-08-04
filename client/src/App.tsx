@@ -9,7 +9,7 @@ import ServicesPage from './pages/ServicesPage';
 import ExpertDashboard from './pages/dashboard/ExpertDashboard';
 import ClientDashboard from './pages/dashboard/ClientDashboard';
 import ProfilePage from './pages/ProfilePage';
-import MessagesPage from './pages/MessagesPage';
+import MessagesPage from './pages/chat/MessagesPage';
 import ServiceDetailPage from './pages/ServiceDetailPage';
 import { UserProvider } from './context/UserContext';
 import EmailVerificationPage from './pages/auth/EmailVerificationPage';
@@ -34,7 +34,7 @@ function App() {
     <UserProvider>
       <Router>
         <div className="min-h-screen bg-gray-50">
-          <Header />
+          <Header  />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />

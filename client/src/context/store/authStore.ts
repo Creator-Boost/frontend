@@ -13,6 +13,9 @@ interface User {
 	name: string;
 	userId : string;
 	role : string;
+	imageUrl?: string;
+	providerProfile?: ProviderProfile;
+  	clientProfile?: ClientProfile;
 
 }
 
@@ -22,12 +25,29 @@ interface ProfileResponse {
 	role: string;
 	accountVerified: boolean;
 	userId: string;
+	imageUrl?: string;
+	providerProfile?: ProviderProfile;
+  	clientProfile?: ClientProfile;
 
 }
 
 interface AuthResponse {
 	email: string;
 	jwt: string;
+}
+
+interface ProviderProfile {
+  title: string;
+  location: string;
+  description: string;
+  languages: string[];
+  skills: string[];
+  certifications: string[];
+}
+
+interface ClientProfile {
+  location: string;
+  preferences: string;
 }
 
 interface AuthState {
@@ -47,6 +67,11 @@ interface AuthState {
 	checkAuth: () => Promise<void>;
 	forgotPassword: (email: string) => Promise<void>;
 	resetPassword: (resetOtp: string, newPassword: string) => Promise<void>;
+	uploadProfileImage: (image: File) => Promise<ProfileResponse>;
+	updateProviderProfile: (profileData: ProviderProfile) => Promise<ProfileResponse>;
+	updateClientProfile: (profileData: ClientProfile) => Promise<ProfileResponse>;
+	getProfile: () => Promise<void>;
+
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -68,7 +93,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 				role
 			});
 			set({ 
-				user: { email: response.data.email, name: response.data.name, userId: response.data.userId, role: response.data.role }, 
+				user: { email: response.data.email, name: response.data.name, userId: response.data.userId, role: response.data.role, imageUrl: response.data.imageUrl }, 
 				isAuthenticated: false, 
 				isLoading: false,
 				message: "Registration successful! Please verify your email."
@@ -96,7 +121,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 			set({
 				isAuthenticated: true,
-				user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role },
+				//user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role, imageUrl: profileResponse.data.imageUrl },
 				error: null,
 				isLoading: false,
 				
@@ -154,7 +179,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 			set({
 				isAuthenticated: true,
-				user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role },
+				//user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role, imageUrl: profileResponse.data.imageUrl },
 				error: null,
 				isLoading: false,
 				
@@ -179,7 +204,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 				// If authenticated, get the user profile
 				const profileResponse = await axios.get<ProfileResponse>(`${API_URL}/profile`);
 				set({
-					user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role },
+					user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role , imageUrl: profileResponse.data.imageUrl },
 					isAuthenticated: true,
 					isCheckingAuth: false,
 				});
@@ -205,7 +230,15 @@ export const useAuthStore = create<AuthState>((set) => ({
 		try {
 			const response = await axios.get<ProfileResponse>(`${API_URL}/profile`);
 			set({
-				user: { email: response.data.email, name: response.data.name, userId: response.data.userId, role: response.data.role },
+				user: { 
+					email: response.data.email, 
+					name: response.data.name, 
+					userId: response.data.userId, 
+					role: response.data.role, 
+					imageUrl: response.data.imageUrl,
+					providerProfile: response.data.providerProfile,
+					clientProfile: response.data.clientProfile
+					},
 				isLoading: false,
 			});
 		} catch (err: unknown) {
@@ -256,5 +289,95 @@ export const useAuthStore = create<AuthState>((set) => ({
 			});
 			throw error;
 		}
-	}
+	},
+
+	uploadProfileImage: async (image: File) => {
+		set({ isLoading: true, error: null });
+		try {
+			const formData = new FormData();
+			formData.append("image", image);
+
+			const response = await axios.put<ProfileResponse>(`${API_URL}/profile/image`, formData, {
+				headers: {
+					"Content-Type": "multipart/form-data"
+				}
+			});
+
+			set((state) => ({
+				user: state.user
+					? {
+						...state.user,
+						imageUrl: response.data.imageUrl
+					}
+					: null,
+				isLoading: false,
+				message: "Profile image uploaded successfully"
+			}));
+
+			return response.data;
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
+			set({
+				isLoading: false,
+				error: error.response?.data?.message || "Failed to upload profile image"
+			});
+			throw error;
+		}
+	},
+	
+	updateProviderProfile: async (profileData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await axios.put<ProfileResponse>(`${API_URL}/provider/profile`, profileData);
+      set((state) => ({
+        user: state.user ? {
+          ...state.user,
+          providerProfile: {
+            title: profileData.title,
+            location: profileData.location,
+            description: profileData.description,
+            languages: profileData.languages,
+            skills: profileData.skills,
+            certifications: profileData.certifications
+          }
+        } : null,
+        isLoading: false,
+        message: "Provider profile updated successfully"
+      }));
+      return response.data;
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message: string }>;
+      set({
+        isLoading: false,
+        error: error.response?.data?.message || "Failed to update provider profile"
+      });
+      throw error;
+    }
+  },
+
+  updateClientProfile: async (profileData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await axios.put<ProfileResponse>(`${API_URL}/client/profile`, profileData);
+      set((state) => ({
+        user: state.user ? {
+          ...state.user,
+          clientProfile: {
+            location: profileData.location,
+            preferences: profileData.preferences
+          }
+        } : null,
+        isLoading: false,
+        message: "Client profile updated successfully"
+      }));
+      return response.data;
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message: string }>;
+      set({
+        isLoading: false,
+        error: error.response?.data?.message || "Failed to update client profile"
+      });
+      throw error;
+    }
+  },
 }));

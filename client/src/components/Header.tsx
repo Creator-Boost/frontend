@@ -55,8 +55,8 @@ const Header: React.FC = () => {
                 <div className="relative group">
                   <button className="flex items-center space-x-2 text-gray-700 hover:text-emerald-600 p-2 rounded-md">
                     <img
-                      src={ `https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400`}
-                      alt="Profile"
+                      src={ user?.imageUrl || 'https://via.placeholder.com/150'}
+                      alt={user?.name || 'User Avatar'}
                       className="h-8 w-8 rounded-full"
                     />
                     <span className="hidden md:block">{user?.name}</span>

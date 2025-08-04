@@ -1,108 +1,74 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Search, Send, Paperclip, MoreVertical } from 'lucide-react';
+
+import { useChatStore } from '../../context/store/chatStore';
+import { useAuthStore } from '../../context/store/authStore';
 
 const MessagesPage: React.FC = () => {
   const [selectedChat, setSelectedChat] = useState('1');
+  
+
+  const { user } = useAuthStore();
+  const {
+    conversations,
+    messages,
+    currentConversation,
+    isConnected,
+    initializeWebSocket,
+    disconnectWebSocket,
+    sendMessage,
+    setCurrentConversation,
+    fetchConversations,
+    fetchMessages
+  } = useChatStore();
+
   const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const conversations = [
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-      lastMessage: 'Thanks for the great work on my YouTube channel!',
-      time: '2:30 PM',
-      unread: 0,
-      online: true,
-      project: 'YouTube Growth Strategy'
-    },
-    {
-      id: '2',
-      name: 'Mike Chen',
-      avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-      lastMessage: 'I have some questions about the Instagram strategy',
-      time: '1:15 PM',
-      unread: 2,
-      online: false,
-      project: 'Instagram Content Strategy'
-    },
-    {
-      id: '3',
-      name: 'Emma Rodriguez',
-      avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=400',
-      lastMessage: 'The TikTok content plan looks perfect!',
-      time: '11:45 AM',
-      unread: 0,
-      online: true,
-      project: 'TikTok Content Creation'
-    },
-    {
-      id: '4',
-      name: 'David Park',
-      avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=400',
-      lastMessage: 'Can we schedule a call to discuss the LinkedIn strategy?',
-      time: 'Yesterday',
-      unread: 1,
-      online: false,
-      project: 'LinkedIn Business Growth'
+  useEffect(() => {
+    if (user?.userId) {
+      initializeWebSocket(user.userId);
+      fetchConversations().finally(() => setIsLoading(false));
     }
-  ];
+    
+    return () => {
+      disconnectWebSocket();
+    };
+  }, [user?.userId]);
 
-  const messages = [
-    {
-      id: '1',
-      sender: 'client',
-      message: 'Hi Sarah! I just received your YouTube audit report. This is exactly what I was looking for!',
-      time: '2:15 PM',
-      avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '2',
-      sender: 'expert',
-      message: 'I\'m so glad you found it helpful! I noticed several areas where we can really boost your channel growth.',
-      time: '2:18 PM',
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '3',
-      sender: 'expert',
-      message: 'The thumbnail optimization alone should increase your click-through rate by at least 30%.',
-      time: '2:18 PM',
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '4',
-      sender: 'client',
-      message: 'That sounds amazing! When can we start implementing these changes?',
-      time: '2:25 PM',
-      avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '5',
-      sender: 'expert',
-      message: 'We can start right away! I\'ll send you a detailed action plan by tomorrow morning.',
-      time: '2:28 PM',
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '6',
-      sender: 'client',
-      message: 'Thanks for the great work on my YouTube channel!',
-      time: '2:30 PM',
-      avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400'
+
+  useEffect(() => {
+    if (currentConversation && user?.userId) {
+      fetchMessages(user.userId, currentConversation);
     }
-  ];
+  }, [currentConversation, user?.userId]);
 
-  const selectedConversation = conversations.find(conv => conv.id === selectedChat);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+
+
+
+  const selectedConversation = conversations.find(conv => conv.id === currentConversation);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim()) {
-      // Here you would send the message
-      console.log('Sending message:', newMessage);
+    if (newMessage.trim() && currentConversation && user?.userId) {
+      await sendMessage({
+        chatId: `${user.userId}-${currentConversation}`,
+        senderId: user.userId,
+        recipientId: currentConversation,
+        content: newMessage
+      });
       setNewMessage('');
     }
   };
+
+  if (!user) {
+    return <div className="flex items-center justify-center h-screen">Please login to view messages</div>;
+  }
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">Loading conversations...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -131,7 +97,7 @@ const MessagesPage: React.FC = () => {
                     key={conversation.id}
                     onClick={() => setSelectedChat(conversation.id)}
                     className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
-                      selectedChat === conversation.id
+                      currentConversation === conversation.id
                         ? 'bg-emerald-50 border-l-4 border-l-emerald-500'
                         : 'hover:bg-gray-50'
                     }`}
@@ -139,27 +105,31 @@ const MessagesPage: React.FC = () => {
                     <div className="flex items-center">
                       <div className="relative">
                         <img
-                          src={conversation.avatar}
-                          alt={conversation.name}
+                          src={conversation.participant.avatar}
+                          alt={conversation.participant.name}
                           className="w-12 h-12 rounded-full"
+                          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                            const target = e.currentTarget;
+                            target.src = `https://ui-avatars.com/api/?name=${conversation.participant.name}&background=random`;
+                          }}
                         />
-                        {conversation.online && (
+                        {conversation.participant.online && (
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                         )}
                       </div>
                       <div className="ml-3 flex-1 min-w-0">
                         <div className="flex justify-between items-start">
                           <h3 className="text-sm font-medium text-gray-900 truncate">
-                            {conversation.name}
+                            {conversation.participant.name}
                           </h3>
-                          <span className="text-xs text-gray-500">{conversation.time}</span>
+                          <span className="text-xs text-gray-500">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <p className="text-xs text-gray-600 mb-1">{conversation.project}</p>
                         <p className="text-sm text-gray-600 truncate">{conversation.lastMessage}</p>
                       </div>
-                      {conversation.unread > 0 && (
+                      {conversation.unreadCount > 0 && (
                         <div className="ml-2 bg-emerald-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                          {conversation.unread}
+                          {conversation.unreadCount}
                         </div>
                       )}
                     </div>
@@ -178,16 +148,20 @@ const MessagesPage: React.FC = () => {
                       <div className="flex items-center">
                         <div className="relative">
                           <img
-                            src={selectedConversation.avatar}
-                            alt={selectedConversation.name}
+                            src={selectedConversation.participant.avatar}
+                            alt={selectedConversation.participant.name}
                             className="w-10 h-10 rounded-full"
+                            onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+                              const target = e.currentTarget;
+                              target.src = `https://ui-avatars.com/api/?name=${selectedConversation.participant.name}&background=random`;
+                            }}
                           />
-                          {selectedConversation.online && (
+                          {selectedConversation.participant.online && (
                             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                           )}
                         </div>
                         <div className="ml-3">
-                          <h3 className="text-lg font-medium text-gray-900">{selectedConversation.name}</h3>
+                          <h3 className="text-lg font-medium text-gray-900">{selectedConversation.participant.name}</h3>
                           <p className="text-sm text-gray-600">{selectedConversation.project}</p>
                         </div>
                       </div>
@@ -202,26 +176,34 @@ const MessagesPage: React.FC = () => {
                     {messages.map((message) => (
                       <div
                         key={message.id}
-                        className={`flex ${message.sender === 'expert' ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${message.senderId === user.userId ? 'justify-end' : 'justify-start'}`}
                       >
                         <div className={`flex items-end space-x-2 max-w-xs lg:max-w-md ${
-                          message.sender === 'expert' ? 'flex-row-reverse space-x-reverse' : ''
+                          message.senderId === user.userId ? 'flex-row-reverse space-x-reverse' : ''
                         }`}>
                           <img
-                            src={message.avatar}
+                            src={
+                              message.senderId === user.userId
+                                ? `https://ui-avatars.com/api/?name=${user.name}&background=random`
+                                : selectedConversation.participant.avatar
+                            }
                             alt="Avatar"
                             className="w-8 h-8 rounded-full"
                           />
                           <div className={`px-4 py-2 rounded-lg ${
-                            message.sender === 'expert'
+                            message.senderId === user.userId
                               ? 'bg-emerald-500 text-white'
                               : 'bg-gray-200 text-gray-900'
                           }`}>
-                            <p className="text-sm">{message.message}</p>
+                            <p className="text-sm">{message.content}</p>
                             <p className={`text-xs mt-1 ${
-                              message.sender === 'expert' ? 'text-emerald-100' : 'text-gray-500'
+                              message.senderId === user.userId ? 'text-emerald-100' : 'text-gray-500'
                             }`}>
-                              {message.time}
+                              {message.timestamp.toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                              {message.status === 'sent' && ' • Sending'}
                             </p>
                           </div>
                         </div>
@@ -247,7 +229,7 @@ const MessagesPage: React.FC = () => {
                       />
                       <button
                         type="submit"
-                        disabled={!newMessage.trim()}
+                        disabled={!newMessage.trim() || !isConnected}
                         className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 text-white p-2 rounded-lg"
                       >
                         <Send className="h-5 w-5" />
