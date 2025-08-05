@@ -59,6 +59,7 @@ interface AuthState {
 	isCheckingAuth: boolean;
 	message: string | null;
 	
+	
 
 	register: (email: string, password: string, name: string, role: string) => Promise<void>;
 	login: (email: string, password: string) => Promise<ProfileResponse>;
@@ -72,6 +73,8 @@ interface AuthState {
 	updateProviderProfile: (profileData: ProviderProfile) => Promise<ProfileResponse>;
 	updateClientProfile: (profileData: ClientProfile) => Promise<ProfileResponse>;
 	getProfile: () => Promise<ProfileResponse>;
+	getAllUsers: () => Promise<ProfileResponse[]>;
+	getProfileById: (userId: string) => Promise<ProfileResponse>;
 
 }
 
@@ -383,4 +386,38 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw error;
     }
   },
+
+  // Add to your useAuthStore implementation
+getAllUsers: async () => {
+  set({ isLoading: true, error: null });
+  try {
+    const response = await axios.get<ProfileResponse[]>(`${API_URL}/users`);
+    set({ isLoading: false });
+    return response.data;
+  } catch (err: unknown) {
+    const error = err as AxiosError<{ message: string }>;
+    set({
+      error: error.response?.data?.message || "Error fetching users",
+      isLoading: false,
+    });
+    throw error;
+  }
+},
+
+	// Add to your useAuthStore implementation
+	getProfileById: async (userId: string) => {
+	set({ isLoading: true, error: null });
+	try {
+		const response = await axios.get<ProfileResponse>(`${API_URL}/profile/${userId}`);
+		set({ isLoading: false });
+		return response.data;
+	} catch (err: unknown) {
+		const error = err as AxiosError<{ message: string }>;
+		set({
+		error: error.response?.data?.message || "Error fetching profile",
+		isLoading: false,
+		});
+		throw error;
+	}
+	},
 }));

@@ -1,67 +1,149 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Star, MapPin, Calendar, Upload, X, Award, MessageCircle, Loader, Save, Edit } from 'lucide-react';
 import { useAuthStore } from '../context/store/authStore';
 import toast from 'react-hot-toast';
+import { useChatStore } from '../context/store/chatStore';
+
+interface ProfileResponse {
+  email: string;
+  name: string;
+  role: string;
+  accountVerified: boolean;
+  userId: string;
+  imageUrl?: string;
+  providerProfile?: {
+    title: string;
+    location: string;
+    description: string;
+    languages: string[];
+    skills: string[];
+    certifications: string[];
+  };
+  clientProfile?: {
+    location: string;
+    preferences: string;
+    description: string;
+  };
+}
+
+interface PortfolioItem {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  results: string;
+}
+
+interface Service {
+  id: string;
+  title: string;
+  price: number;
+  rating: number;
+  reviews: number;
+  deliveryTime: string;
+  description: string;
+}
+
+interface Review {
+  id: string;
+  client: string;
+  avatar: string;
+  rating: number;
+  date: string;
+  service: string;
+  review: string;
+}
 
 const ProfilePage: React.FC = () => {
   const { id } = useParams();
-  const { user, uploadProfileImage, isLoading, updateProviderProfile, updateClientProfile, getProfile } = useAuthStore();
+  const { 
+    user, 
+    uploadProfileImage, 
+    isLoading, 
+    updateProviderProfile, 
+    updateClientProfile, 
+    getProfile,
+    getProfileById 
+  } = useAuthStore();
+
+   const { startConversation, isConnected, initializeChat } = useChatStore();
+  
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
-  
-  const [profileData, setProfileData] = useState({
-    title: '',
-    location: '',
-    description: '',
-    languages: [] as string[],
-    skills: [] as string[],
-    certifications: [] as string[],
-    preferences: '',
-  });
-  
+  const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
   const [newLanguage, setNewLanguage] = useState('');
   const [newSkill, setNewSkill] = useState('');
   const [newCertification, setNewCertification] = useState('');
+  const navigate = useNavigate();
+
+  const isCurrentUserProfile = user?.userId === id;
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (user && user.userId === id && !profileData.title && !profileData.location) {
-        setIsLoadingProfile(true);
-        try {
-          const profile = await getProfile();
-          console.log("User profile fetched:", user);
-          
-          if (user.role === 'PROVIDER') {
-            setProfileData(prev => ({
-              ...prev,
-              title: profile.providerProfile?.title || '',
-              location: profile.providerProfile?.location || '',
-              description: profile.providerProfile?.description || '',
-              languages: profile.providerProfile?.languages || [],
-              skills: profile.providerProfile?.skills || [],
-              certifications: profile.providerProfile?.certifications || [],
-            }));
-          } else if (user.role === 'CLIENT') {
-            setProfileData(prev => ({
-              ...prev,
-              location: profile.clientProfile?.location || '',
-              preferences: profile.clientProfile?.preferences || '',
-              description: profile.clientProfile?.description || '',
-            }));
-          }
-        } catch (error) {
-          console.error("Failed to fetch profile:", error);
-        } finally {
-          setIsLoadingProfile(false);
+      setIsLoadingProfile(true);
+      try {
+        let profile;
+        
+        if (isCurrentUserProfile) {
+          profile = await getProfile();
+        } else {
+          profile = await getProfileById(id!);
         }
+        
+        setProfileData(profile);
+        console.log("Fetched profile data:", profile);
+      } catch (error) {
+        console.error("Failed to fetch profile:", error);
+        toast.error("Failed to load profile");
+      } finally {
+        setIsLoadingProfile(false);
       }
     };
 
     fetchProfile();
-  }, [id, user?.userId, user?.role]);
+  }, [id, isCurrentUserProfile, getProfile, getProfileById]);
+
+
+  // Initialize chat when user is logged in
+  useEffect(() => {
+    if (user?.userId && !isConnected) {
+      initializeChat(user.userId);
+    }
+  }, [user?.userId, isConnected, initializeChat]);
+
+  // Initialize chat when user is logged in
+  useEffect(() => {
+    if (user?.userId && !isConnected) {
+      initializeChat(user.userId);
+    }
+  }, [user?.userId, isConnected, initializeChat]);
+
+  const handleContactMe = () => {
+    if (!user) {
+      toast.error("Please log in to start a conversation");
+      return;
+    }
+
+    if (!profileData) {
+      toast.error("Profile data not loaded");
+      return;
+    }
+
+    // Start conversation
+    startConversation(
+      profileData.userId,
+      profileData.name,
+      profileData.imageUrl || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
+    );
+
+    // Navigate to messages page
+    navigate('/messages');
+    toast.success(`Started conversation with ${profileData.name}`);
+  };
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -83,6 +165,9 @@ const ProfilePage: React.FC = () => {
         toast.success("Profile image uploaded successfully");
         setSelectedFile(null);
         setPreviewUrl(null);
+        // Refresh profile data
+        const updatedProfile = await getProfile();
+        setProfileData(updatedProfile);
       } catch (err) {
         console.error("Failed to upload image:", err);
         toast.error("Failed to upload image");
@@ -98,16 +183,19 @@ const ProfilePage: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setProfileData(prev => ({
-      ...prev,
+      ...prev!,
       [name]: value
     }));
   };
 
   const handleAddLanguage = () => {
-    if (newLanguage && !profileData.languages.includes(newLanguage)) {
+    if (newLanguage && !profileData?.providerProfile?.languages.includes(newLanguage)) {
       setProfileData(prev => ({
-        ...prev,
-        languages: [...prev.languages, newLanguage]
+        ...prev!,
+        providerProfile: {
+          ...prev!.providerProfile!,
+          languages: [...prev!.providerProfile!.languages, newLanguage]
+        }
       }));
       setNewLanguage('');
     }
@@ -115,16 +203,22 @@ const ProfilePage: React.FC = () => {
 
   const handleRemoveLanguage = (language: string) => {
     setProfileData(prev => ({
-      ...prev,
-      languages: prev.languages.filter(l => l !== language)
+      ...prev!,
+      providerProfile: {
+        ...prev!.providerProfile!,
+        languages: prev!.providerProfile!.languages.filter(l => l !== language)
+      }
     }));
   };
 
   const handleAddSkill = () => {
-    if (newSkill && !profileData.skills.includes(newSkill)) {
+    if (newSkill && !profileData?.providerProfile?.skills.includes(newSkill)) {
       setProfileData(prev => ({
-        ...prev,
-        skills: [...prev.skills, newSkill]
+        ...prev!,
+        providerProfile: {
+          ...prev!.providerProfile!,
+          skills: [...prev!.providerProfile!.skills, newSkill]
+        }
       }));
       setNewSkill('');
     }
@@ -132,16 +226,22 @@ const ProfilePage: React.FC = () => {
 
   const handleRemoveSkill = (skill: string) => {
     setProfileData(prev => ({
-      ...prev,
-      skills: prev.skills.filter(s => s !== skill)
+      ...prev!,
+      providerProfile: {
+        ...prev!.providerProfile!,
+        skills: prev!.providerProfile!.skills.filter(s => s !== skill)
+      }
     }));
   };
 
   const handleAddCertification = () => {
-    if (newCertification && !profileData.certifications.includes(newCertification)) {
+    if (newCertification && !profileData?.providerProfile?.certifications.includes(newCertification)) {
       setProfileData(prev => ({
-        ...prev,
-        certifications: [...prev.certifications, newCertification]
+        ...prev!,
+        providerProfile: {
+          ...prev!.providerProfile!,
+          certifications: [...prev!.providerProfile!.certifications, newCertification]
+        }
       }));
       setNewCertification('');
     }
@@ -149,79 +249,119 @@ const ProfilePage: React.FC = () => {
 
   const handleRemoveCertification = (certification: string) => {
     setProfileData(prev => ({
-      ...prev,
-      certifications: prev.certifications.filter(c => c !== certification)
+      ...prev!,
+      providerProfile: {
+        ...prev!.providerProfile!,
+        certifications: prev!.providerProfile!.certifications.filter(c => c !== certification)
+      }
     }));
   };
 
   const handleSaveProfile = async () => {
+    if (!profileData) return;
+    
     try {
-      if (user?.role === 'PROVIDER') {
+      if (profileData.role === 'PROVIDER' && profileData.providerProfile) {
         await updateProviderProfile({
-          title: profileData.title,
-          location: profileData.location,
-          description: profileData.description,
-          languages: profileData.languages,
-          skills: profileData.skills,
-          certifications: profileData.certifications
+          title: profileData.providerProfile.title,
+          location: profileData.providerProfile.location,
+          description: profileData.providerProfile.description,
+          languages: profileData.providerProfile.languages,
+          skills: profileData.providerProfile.skills,
+          certifications: profileData.providerProfile.certifications
         });
-      } else if (user?.role === 'CLIENT') {
+      } else if (profileData.role === 'CLIENT' && profileData.clientProfile) {
         await updateClientProfile({
-          location: profileData.location,
-          preferences: profileData.preferences,
-          description: profileData.description,
+          location: profileData.clientProfile.location,
+          preferences: profileData.clientProfile.preferences,
+          description: profileData.clientProfile.description,
         });
       }
+      
       setIsEditing(false);
       toast.success("Profile updated successfully");
+      
+      // Refresh profile data
+      const updatedProfile = await getProfile();
+      setProfileData(updatedProfile);
     } catch (err) {
       console.error("Failed to update profile:", err);
       toast.error("Failed to update profile");
     }
   };
 
-  const profile = useMemo(() => ({
-    id: user?.userId || '1',
-    name: user?.name || 'John Doe',
-    title: isEditing ? profileData.title :
-      (user?.role === 'PROVIDER' ? user?.providerProfile?.title : 'Client'),
-    avatar: previewUrl || user?.imageUrl || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-    location: isEditing ? profileData.location :
-      (user?.role === 'PROVIDER' ? user?.providerProfile?.location : user?.clientProfile?.location) || 'Unknown',
-    memberSince: 'January 2020',
-    rating: 4.9,
-    reviewCount: 127,
-    completedOrders: 250,
-    responseTime: '2 hours',
-    languages: isEditing ? profileData.languages :
-      (user?.role === 'PROVIDER' ? user?.providerProfile?.languages : []) || ['English'],
-    skills: isEditing ? profileData.skills :
-      (user?.role === 'PROVIDER' ? user?.providerProfile?.skills : []) || [],
-    description: isEditing ? profileData.description :
-      (user?.providerProfile?.description || user?.clientProfile?.description || '') || '',
-    certifications: isEditing ? profileData.certifications :
-      (user?.role === 'PROVIDER' ? user?.providerProfile?.certifications : []) || [],
-    preferences: isEditing ? profileData.preferences :
-      (user?.role === 'CLIENT' ? user?.clientProfile?.preferences : '') || '',
-    portfolio: [
-      {
-        id: '1',
-        title: 'Tech Channel Growth',
-        description: 'Helped a tech channel grow from 1K to 50K subscribers in 6 months',
-        image: 'https://images.pexels.com/photos/4050318/pexels-photo-4050318.jpeg?auto=compress&cs=tinysrgb&w=400',
-        results: '+4900% subscriber growth'
-      },
-      {
-        id: '2',
-        title: 'Instagram Business Growth',
-        description: 'Increased engagement rate by 300% for a local business',
-        image: 'https://images.pexels.com/photos/267350/pexels-photo-267350.jpeg?auto=compress&cs=tinysrgb&w=400',
-        results: '+300% engagement rate'
-      }
-    ]
-  }), [user, isEditing, profileData, previewUrl]);
+  const profile = useMemo(() => {
+    if (!profileData) return null;
 
-  const services = user?.role === 'PROVIDER' ? [
+    return {
+      id: profileData.userId,
+      name: profileData.name,
+      title: isEditing && isCurrentUserProfile && profileData.role === 'PROVIDER' 
+        ? profileData.providerProfile?.title || '' 
+        : profileData.role === 'PROVIDER' 
+          ? profileData.providerProfile?.title 
+          : 'Client',
+      avatar: previewUrl || profileData.imageUrl || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+      location: isEditing && isCurrentUserProfile
+        ? profileData.role === 'PROVIDER'
+          ? profileData.providerProfile?.location
+          : profileData.clientProfile?.location
+        : profileData.role === 'PROVIDER'
+          ? profileData.providerProfile?.location
+          : profileData.clientProfile?.location || 'Unknown',
+      memberSince: 'January 2020',
+      rating: 4.9,
+      reviewCount: 127,
+      completedOrders: 250,
+      responseTime: '2 hours',
+      languages: isEditing && isCurrentUserProfile && profileData.role === 'PROVIDER'
+        ? profileData.providerProfile?.languages || []
+        : profileData.role === 'PROVIDER'
+          ? profileData.providerProfile?.languages || ['English']
+          : [],
+      skills: isEditing && isCurrentUserProfile && profileData.role === 'PROVIDER'
+        ? profileData.providerProfile?.skills || []
+        : profileData.role === 'PROVIDER'
+          ? profileData.providerProfile?.skills || []
+          : [],
+      description: isEditing && isCurrentUserProfile
+        ? profileData.role === 'PROVIDER'
+          ? profileData.providerProfile?.description
+          : profileData.clientProfile?.description
+        : profileData.role === 'PROVIDER'
+          ? profileData.providerProfile?.description
+          : profileData.clientProfile?.description || '',
+      certifications: isEditing && isCurrentUserProfile && profileData.role === 'PROVIDER'
+        ? profileData.providerProfile?.certifications || []
+        : profileData.role === 'PROVIDER'
+          ? profileData.providerProfile?.certifications || []
+          : [],
+      preferences: isEditing && isCurrentUserProfile && profileData.role === 'CLIENT'
+        ? profileData.clientProfile?.preferences || ''
+        : profileData.role === 'CLIENT'
+          ? profileData.clientProfile?.preferences || ''
+          : '',
+      role: profileData.role,
+      portfolio: [
+        {
+          id: '1',
+          title: 'Tech Channel Growth',
+          description: 'Helped a tech channel grow from 1K to 50K subscribers in 6 months',
+          image: 'https://images.pexels.com/photos/4050318/pexels-photo-4050318.jpeg?auto=compress&cs=tinysrgb&w=400',
+          results: '+4900% subscriber growth'
+        },
+        {
+          id: '2',
+          title: 'Instagram Business Growth',
+          description: 'Increased engagement rate by 300% for a local business',
+          image: 'https://images.pexels.com/photos/267350/pexels-photo-267350.jpeg?auto=compress&cs=tinysrgb&w=400',
+          results: '+300% engagement rate'
+        }
+      ] as PortfolioItem[]
+    };
+  }, [profileData, isEditing, isCurrentUserProfile, previewUrl]);
+
+  const services: Service[] = profileData?.role === 'PROVIDER' ? [
     {
       id: '1',
       title: 'YouTube Channel Growth Strategy',
@@ -251,7 +391,7 @@ const ProfilePage: React.FC = () => {
     }
   ] : [];
 
-  const reviews = user?.role === 'PROVIDER' ? [
+  const reviews: Review[] = profileData?.role === 'PROVIDER' ? [
     {
       id: '1',
       client: 'John Smith',
@@ -281,7 +421,7 @@ const ProfilePage: React.FC = () => {
     }
   ] : [];
 
-  if (isLoadingProfile) {
+  if (isLoadingProfile || !profileData || !profile) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader className="animate-spin h-10 w-10 text-emerald-500" />
@@ -304,7 +444,7 @@ const ProfilePage: React.FC = () => {
                     alt={profile.name}
                     className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
                   />
-                  {user?.userId === id && (
+                  {isCurrentUserProfile && (
                     <label 
                       htmlFor="profile-upload"
                       className="absolute bottom-0 right-0 bg-emerald-500 text-white p-2 rounded-full cursor-pointer hover:bg-emerald-600 transition"
@@ -347,12 +487,18 @@ const ProfilePage: React.FC = () => {
                   </div>
                 )}
                 <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
-                {user?.role === 'PROVIDER' && (isEditing ? (
+                {profile.role === 'PROVIDER' && (isEditing ? (
                   <input
                     type="text"
                     name="title"
-                    value={profileData.title}
-                    onChange={handleInputChange}
+                    value={profileData.providerProfile?.title || ''}
+                    onChange={(e) => setProfileData({
+                      ...profileData,
+                      providerProfile: {
+                        ...profileData.providerProfile!,
+                        title: e.target.value
+                      }
+                    })}
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                     placeholder="Your title"
                   />
@@ -365,8 +511,28 @@ const ProfilePage: React.FC = () => {
                     <input
                       type="text"
                       name="location"
-                      value={profileData.location}
-                      onChange={handleInputChange}
+                      value={profile.role === 'PROVIDER' 
+                        ? profileData.providerProfile?.location || '' 
+                        : profileData.clientProfile?.location || ''}
+                      onChange={(e) => {
+                        if (profile.role === 'PROVIDER') {
+                          setProfileData({
+                            ...profileData,
+                            providerProfile: {
+                              ...profileData.providerProfile!,
+                              location: e.target.value
+                            }
+                          });
+                        } else {
+                          setProfileData({
+                            ...profileData,
+                            clientProfile: {
+                              ...profileData.clientProfile!,
+                              location: e.target.value
+                            }
+                          });
+                        }
+                      }}
                       className="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                       placeholder="Your location"
                     />
@@ -377,7 +543,7 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Stats - Only for providers */}
-              {user?.role === 'PROVIDER' && (
+              {profile.role === 'PROVIDER' && (
                 <div className="border-t border-b border-gray-200 py-4 mb-6">
                   <div className="flex items-center justify-center mb-2">
                     <div className="flex items-center">
@@ -400,7 +566,7 @@ const ProfilePage: React.FC = () => {
               )}
 
               {/* Contact/Edit Button */}
-              {user?.userId === id ? (
+              {isCurrentUserProfile ? (
                 <div className="flex justify-end mb-4">
                   {isEditing ? (
                     <button
@@ -421,7 +587,10 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <button className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold mb-4">
+                <button
+                  className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold mb-4"
+                  onClick={handleContactMe}
+                >
                   <MessageCircle className="h-5 w-5" />
                   Contact Me
                 </button>
@@ -435,13 +604,13 @@ const ProfilePage: React.FC = () => {
                 </div>
                 
                 {/* Languages - Only for providers */}
-                {user?.role === 'PROVIDER' && (
+                {profile.role === 'PROVIDER' && (
                   <div>
                     <span className="text-gray-600">Languages: </span>
                     {isEditing ? (
                       <div className="mt-2">
                         <div className="flex flex-wrap gap-2 mb-2">
-                          {profileData.languages.map((language) => (
+                          {profileData.providerProfile?.languages.map((language) => (
                             <span
                               key={language}
                               className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs flex items-center"
@@ -482,34 +651,40 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Preferences - Only for clients */}
-              {user?.role === 'CLIENT' && (
-              <div className="mt-6">
-                <h3 className="font-semibold text-gray-900 mb-3">Preferences</h3>
-                {isEditing ? (
-                  <textarea
-                    name="preferences"
-                    value={profileData.preferences}
-                    onChange={handleInputChange}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                    placeholder="Tell us about your preferences"
-                  />
-                ) : (
-                  <p className="text-gray-700 whitespace-pre-line">
-                    {profile.preferences || 'No preferences provided.'}
-                  </p>
-                )}
-              </div>
-            )}
+              {profile.role === 'CLIENT' && (
+                <div className="mt-6">
+                  <h3 className="font-semibold text-gray-900 mb-3">Preferences</h3>
+                  {isEditing ? (
+                    <textarea
+                      name="preferences"
+                      value={profileData.clientProfile?.preferences || ''}
+                      onChange={(e) => setProfileData({
+                        ...profileData,
+                        clientProfile: {
+                          ...profileData.clientProfile!,
+                          preferences: e.target.value
+                        }
+                      })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                      placeholder="Tell us about your preferences"
+                    />
+                  ) : (
+                    <p className="text-gray-700 whitespace-pre-line">
+                      {profile.preferences || 'No preferences provided.'}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Skills - Only for providers */}
-              {user?.role === 'PROVIDER' && (
+              {profile.role === 'PROVIDER' && (
                 <div className="mt-6">
                   <h3 className="font-semibold text-gray-900 mb-3">Skills</h3>
                   {isEditing ? (
                     <div>
                       <div className="flex flex-wrap gap-2 mb-2">
-                        {profileData.skills.map((skill) => (
+                        {profileData.providerProfile?.skills.map((skill) => (
                           <span
                             key={skill}
                             className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs flex items-center"
@@ -558,12 +733,12 @@ const ProfilePage: React.FC = () => {
               )}
 
               {/* Certifications - Only for providers */}
-              {user?.role === 'PROVIDER' && (
+              {profile.role === 'PROVIDER' && (
                 <div className="mt-6">
                   <h3 className="font-semibold text-gray-900 mb-3">Certifications</h3>
                   {isEditing ? (
                     <div className="space-y-2">
-                      {profileData.certifications.map((cert) => (
+                      {profileData.providerProfile?.certifications.map((cert) => (
                         <div key={cert} className="flex items-center justify-between text-sm">
                           <div className="flex items-center">
                             <Award className="h-4 w-4 text-emerald-500 mr-2" />
@@ -618,21 +793,41 @@ const ProfilePage: React.FC = () => {
               {isEditing ? (
                 <textarea
                   name="description"
-                  value={profileData.description}
-                  onChange={handleInputChange}
+                  value={profile.role === 'PROVIDER' 
+                    ? profileData.providerProfile?.description || '' 
+                    : profileData.clientProfile?.description || ''}
+                  onChange={(e) => {
+                    if (profile.role === 'PROVIDER') {
+                      setProfileData({
+                        ...profileData,
+                        providerProfile: {
+                          ...profileData.providerProfile!,
+                          description: e.target.value
+                        }
+                      });
+                    } else {
+                      setProfileData({
+                        ...profileData,
+                        clientProfile: {
+                          ...profileData.clientProfile!,
+                          description: e.target.value
+                        }
+                      });
+                    }
+                  }}
                   rows={8}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                   placeholder="Tell us about yourself and your services"
                 />
               ) : (
                 <div className="text-gray-700 whitespace-pre-line">
-                  {profile.description || (user?.role === 'CLIENT' ? 'No description provided' : '')}
+                  {profile.description || (profile.role === 'CLIENT' ? 'No description provided' : '')}
                 </div>
               )}
             </div>
 
             {/* Portfolio - Only for providers */}
-            {user?.role === 'PROVIDER' && (
+            {profile.role === 'PROVIDER' && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Portfolio</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -657,7 +852,7 @@ const ProfilePage: React.FC = () => {
             )}
 
             {/* Services - Only for providers */}
-            {user?.role === 'PROVIDER' && services.length > 0 && (
+            {profile.role === 'PROVIDER' && services.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">My Services</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -686,7 +881,7 @@ const ProfilePage: React.FC = () => {
             )}
 
             {/* Reviews - Only for providers */}
-            {user?.role === 'PROVIDER' && reviews.length > 0 && (
+            {profile.role === 'PROVIDER' && reviews.length > 0 && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
                   Reviews ({profile.reviewCount})

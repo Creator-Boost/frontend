@@ -18,16 +18,26 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import { useAuthStore } from './context/store/authStore';
 import { useEffect, useState } from 'react';
 import LoadingScreen from './components/LoadingPage';
+import UsersList from './pages/users';
+import { useChatStore } from './context/store/chatStore';
 
 function App() {
   const { isCheckingAuth, checkAuth } = useAuthStore();
   const [isAnimationDone, setIsAnimationDone] = useState(false);
+  const { disconnect } = useChatStore();
 
   useEffect(() => {
     checkAuth();
     const timer = setTimeout(() => setIsAnimationDone(true), 1200);
     return () => clearTimeout(timer);
   }, [checkAuth]);
+
+  // Cleanup chat connection on unmount
+  useEffect(() => {
+    return () => {
+      disconnect();
+    };
+  }, [disconnect]);
 
   if (isCheckingAuth || !isAnimationDone) return <LoadingScreen />;
   return (
@@ -48,6 +58,7 @@ function App() {
             <Route path="/verify-email" element={<EmailVerificationPage />} />
             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/users" element={<UsersList />} />
 
 
           </Routes>
