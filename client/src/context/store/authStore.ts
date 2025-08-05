@@ -48,6 +48,7 @@ interface ProviderProfile {
 interface ClientProfile {
   location: string;
   preferences: string;
+  description: string;
 }
 
 interface AuthState {
@@ -70,7 +71,7 @@ interface AuthState {
 	uploadProfileImage: (image: File) => Promise<ProfileResponse>;
 	updateProviderProfile: (profileData: ProviderProfile) => Promise<ProfileResponse>;
 	updateClientProfile: (profileData: ClientProfile) => Promise<ProfileResponse>;
-	getProfile: () => Promise<void>;
+	getProfile: () => Promise<ProfileResponse>;
 
 }
 
@@ -241,6 +242,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 					},
 				isLoading: false,
 			});
+			return response.data;
 		} catch (err: unknown) {
 			const error = err as AxiosError<{ message: string }>;
 			set({
@@ -364,7 +366,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           ...state.user,
           clientProfile: {
             location: profileData.location,
-            preferences: profileData.preferences
+            preferences: profileData.preferences,
+            description: profileData.description
           }
         } : null,
         isLoading: false,

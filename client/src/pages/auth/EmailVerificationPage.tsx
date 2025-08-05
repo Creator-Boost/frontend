@@ -58,6 +58,7 @@ const EmailVerificationPage = () => {
     try {
       await verifyOtp(verificationCode);
 	  toast.success("Email verified successfully");
+	  
       navigate("/");
 
     } catch (error) {

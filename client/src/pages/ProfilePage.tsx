@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Star, MapPin, Calendar, Upload,  X, Award, MessageCircle, Loader, Save, Edit } from 'lucide-react';
+import { Star, MapPin, Calendar, Upload, X, Award, MessageCircle, Loader, Save, Edit } from 'lucide-react';
 import { useAuthStore } from '../context/store/authStore';
 import toast from 'react-hot-toast';
 
 const ProfilePage: React.FC = () => {
   const { id } = useParams();
-  const { user, uploadProfileImage, isLoading, updateProviderProfile, updateClientProfile } = useAuthStore();
+  const { user, uploadProfileImage, isLoading, updateProviderProfile, updateClientProfile, getProfile } = useAuthStore();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   
   const [profileData, setProfileData] = useState({
     title: '',
@@ -25,39 +26,48 @@ const ProfilePage: React.FC = () => {
   const [newSkill, setNewSkill] = useState('');
   const [newCertification, setNewCertification] = useState('');
 
-  // Initialize profile data when user loads
   useEffect(() => {
-    if (user) {
-      if (user.role === 'PROVIDER' && user.providerProfile) {
-        setProfileData({
-          title: user.providerProfile.title || '',
-          location: user.providerProfile.location || '',
-          description: user.providerProfile.description || '',
-          languages: user.providerProfile.languages || [],
-          skills: user.providerProfile.skills || [],
-          certifications: user.providerProfile.certifications || [],
-          preferences: '',
-        });
-      } else if (user.role === 'CLIENT' && user.clientProfile) {
-        setProfileData({
-          title: '',
-          location: user.clientProfile.location || '',
-          description: '',
-          languages: [],
-          skills: [],
-          certifications: [],
-          preferences: user.clientProfile.preferences || '',
-        });
+    const fetchProfile = async () => {
+      if (user && user.userId === id && !profileData.title && !profileData.location) {
+        setIsLoadingProfile(true);
+        try {
+          const profile = await getProfile();
+          console.log("User profile fetched:", user);
+          
+          if (user.role === 'PROVIDER') {
+            setProfileData(prev => ({
+              ...prev,
+              title: profile.providerProfile?.title || '',
+              location: profile.providerProfile?.location || '',
+              description: profile.providerProfile?.description || '',
+              languages: profile.providerProfile?.languages || [],
+              skills: profile.providerProfile?.skills || [],
+              certifications: profile.providerProfile?.certifications || [],
+            }));
+          } else if (user.role === 'CLIENT') {
+            setProfileData(prev => ({
+              ...prev,
+              location: profile.clientProfile?.location || '',
+              preferences: profile.clientProfile?.preferences || '',
+              description: profile.clientProfile?.description || '',
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to fetch profile:", error);
+        } finally {
+          setIsLoadingProfile(false);
+        }
       }
-    }
-  }, [user]);
+    };
+
+    fetchProfile();
+  }, [id, user?.userId, user?.role]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
       
-      // Create preview
       const reader = new FileReader();
       reader.onload = () => {
         setPreviewUrl(reader.result as string);
@@ -158,7 +168,8 @@ const ProfilePage: React.FC = () => {
       } else if (user?.role === 'CLIENT') {
         await updateClientProfile({
           location: profileData.location,
-          preferences: profileData.preferences
+          preferences: profileData.preferences,
+          description: profileData.description,
         });
       }
       setIsEditing(false);
@@ -169,29 +180,28 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // Profile data based on role
-  const profile = {
+  const profile = useMemo(() => ({
     id: user?.userId || '1',
     name: user?.name || 'John Doe',
-    title: isEditing ? profileData.title : 
+    title: isEditing ? profileData.title :
       (user?.role === 'PROVIDER' ? user?.providerProfile?.title : 'Client'),
     avatar: previewUrl || user?.imageUrl || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-    location: isEditing ? profileData.location : 
+    location: isEditing ? profileData.location :
       (user?.role === 'PROVIDER' ? user?.providerProfile?.location : user?.clientProfile?.location) || 'Unknown',
     memberSince: 'January 2020',
     rating: 4.9,
     reviewCount: 127,
     completedOrders: 250,
     responseTime: '2 hours',
-    languages: isEditing ? profileData.languages : 
+    languages: isEditing ? profileData.languages :
       (user?.role === 'PROVIDER' ? user?.providerProfile?.languages : []) || ['English'],
-    skills: isEditing ? profileData.skills : 
+    skills: isEditing ? profileData.skills :
       (user?.role === 'PROVIDER' ? user?.providerProfile?.skills : []) || [],
-    description: isEditing ? profileData.description : 
-      (user?.role === 'PROVIDER' ? user?.providerProfile?.description : '') || '',
-    certifications: isEditing ? profileData.certifications : 
+    description: isEditing ? profileData.description :
+      (user?.providerProfile?.description || user?.clientProfile?.description || '') || '',
+    certifications: isEditing ? profileData.certifications :
       (user?.role === 'PROVIDER' ? user?.providerProfile?.certifications : []) || [],
-    preferences: isEditing ? profileData.preferences : 
+    preferences: isEditing ? profileData.preferences :
       (user?.role === 'CLIENT' ? user?.clientProfile?.preferences : '') || '',
     portfolio: [
       {
@@ -209,7 +219,7 @@ const ProfilePage: React.FC = () => {
         results: '+300% engagement rate'
       }
     ]
-  };
+  }), [user, isEditing, profileData, previewUrl]);
 
   const services = user?.role === 'PROVIDER' ? [
     {
@@ -270,6 +280,14 @@ const ProfilePage: React.FC = () => {
       review: 'Professional, thorough, and results-driven. Sarah identified areas I never would have thought of and provided actionable solutions.'
     }
   ] : [];
+
+  if (isLoadingProfile) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader className="animate-spin h-10 w-10 text-emerald-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -464,9 +482,10 @@ const ProfilePage: React.FC = () => {
               </div>
 
               {/* Preferences - Only for clients */}
-              {user?.role === 'CLIENT' && isEditing && (
-                <div className="mt-6">
-                  <h3 className="font-semibold text-gray-900 mb-3">Preferences</h3>
+              {user?.role === 'CLIENT' && (
+              <div className="mt-6">
+                <h3 className="font-semibold text-gray-900 mb-3">Preferences</h3>
+                {isEditing ? (
                   <textarea
                     name="preferences"
                     value={profileData.preferences}
@@ -475,8 +494,13 @@ const ProfilePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
                     placeholder="Tell us about your preferences"
                   />
-                </div>
-              )}
+                ) : (
+                  <p className="text-gray-700 whitespace-pre-line">
+                    {profile.preferences || 'No preferences provided.'}
+                  </p>
+                )}
+              </div>
+            )}
 
               {/* Skills - Only for providers */}
               {user?.role === 'PROVIDER' && (

@@ -40,7 +40,8 @@ const LoginPage: React.FC = () => {
     
     try {
       const userData = await login(email, password);
-      
+      console.log('User data in handleSignUp:', userData);
+
       if (!userData.accountVerified) {
         // If not verified, send OTP and navigate to verification page
         await sendVerifyOtp();
