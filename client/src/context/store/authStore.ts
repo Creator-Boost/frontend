@@ -48,6 +48,7 @@ interface ProviderProfile {
 interface ClientProfile {
   location: string;
   preferences: string;
+  description: string;
 }
 
 interface AuthState {
@@ -57,6 +58,7 @@ interface AuthState {
 	isLoading: boolean;
 	isCheckingAuth: boolean;
 	message: string | null;
+	
 	
 
 	register: (email: string, password: string, name: string, role: string) => Promise<void>;
@@ -70,7 +72,9 @@ interface AuthState {
 	uploadProfileImage: (image: File) => Promise<ProfileResponse>;
 	updateProviderProfile: (profileData: ProviderProfile) => Promise<ProfileResponse>;
 	updateClientProfile: (profileData: ClientProfile) => Promise<ProfileResponse>;
-	getProfile: () => Promise<void>;
+	getProfile: () => Promise<ProfileResponse>;
+	getAllUsers: () => Promise<ProfileResponse[]>;
+	getProfileById: (userId: string) => Promise<ProfileResponse>;
 
 }
 
@@ -241,6 +245,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 					},
 				isLoading: false,
 			});
+			return response.data;
 		} catch (err: unknown) {
 			const error = err as AxiosError<{ message: string }>;
 			set({
@@ -364,7 +369,8 @@ export const useAuthStore = create<AuthState>((set) => ({
           ...state.user,
           clientProfile: {
             location: profileData.location,
-            preferences: profileData.preferences
+            preferences: profileData.preferences,
+            description: profileData.description
           }
         } : null,
         isLoading: false,
@@ -380,4 +386,38 @@ export const useAuthStore = create<AuthState>((set) => ({
       throw error;
     }
   },
+
+  // Add to your useAuthStore implementation
+getAllUsers: async () => {
+  set({ isLoading: true, error: null });
+  try {
+    const response = await axios.get<ProfileResponse[]>(`${API_URL}/users`);
+    set({ isLoading: false });
+    return response.data;
+  } catch (err: unknown) {
+    const error = err as AxiosError<{ message: string }>;
+    set({
+      error: error.response?.data?.message || "Error fetching users",
+      isLoading: false,
+    });
+    throw error;
+  }
+},
+
+	// Add to your useAuthStore implementation
+	getProfileById: async (userId: string) => {
+	set({ isLoading: true, error: null });
+	try {
+		const response = await axios.get<ProfileResponse>(`${API_URL}/profile/${userId}`);
+		set({ isLoading: false });
+		return response.data;
+	} catch (err: unknown) {
+		const error = err as AxiosError<{ message: string }>;
+		set({
+		error: error.response?.data?.message || "Error fetching profile",
+		isLoading: false,
+		});
+		throw error;
+	}
+	},
 }));

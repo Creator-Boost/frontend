@@ -1,209 +1,199 @@
-// stores/chatStore.ts
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import { Client, IMessage } from '@stomp/stompjs';
-import axios from 'axios';
+import { chatService, ChatMessage, ChatNotification } from '../../services/chatService';
+import { useAuthStore } from './authStore';
 
-interface ChatMessage {
-  id: string;
-  chatId: string;
-  senderId: string;
-  recipientId: string;
-  content: string;
-  timestamp: Date;
-  status?: 'sent' | 'delivered' | 'read';
-}
 
-interface Conversation {
+export interface Conversation {
   id: string;
-  participant: {
-    id: string;
-    name: string;
-    avatar: string;
-    online: boolean;
-  };
-  lastMessage: string;
+  participantId: string;
+  participantName: string;
+  participantAvatar: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
   unreadCount: number;
-  project: string;
+  online: boolean;
 }
 
 interface ChatState {
-  client: Client | null;
-  isConnected: boolean;
   conversations: Conversation[];
-  currentConversation: string | null;
-  messages: ChatMessage[];
-  initializeWebSocket: (userId: string) => void;
-  disconnectWebSocket: () => void;
-  sendMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => Promise<void>;
-  setCurrentConversation: (conversationId: string) => void;
-  markMessagesAsRead: (conversationId: string) => void;
-  fetchConversations: () => Promise<void>;
-  fetchMessages: (senderId: string, recipientId: string) => Promise<void>;
+  selectedConversation: string | null;
+  messages: { [conversationId: string]: ChatMessage[] };
+  isConnected: boolean;
+  isLoading: boolean;
+  
+  // Actions
+  initializeChat: (userId: string) => Promise<void>;
+  selectConversation: (conversationId: string) => void;
+  sendMessage: (recipientId: string, content: string) => void;
+  loadMessages: (senderId: string, recipientId: string) => Promise<void>;
+  addMessage: (message: ChatMessage) => void;
+  startConversation: (participantId: string, participantName: string, participantAvatar: string) => void;
+  disconnect: () => void;
 }
 
-export const useChatStore = create<ChatState>()(
-  devtools((set, get) => ({
-    client: null,
-    isConnected: false,
-    conversations: [],
-    currentConversation: null,
-    messages: [],
+export const useChatStore = create<ChatState>((set, get) => ({
+  conversations: [],
+  selectedConversation: null,
+  messages: {},
+  isConnected: false,
+  isLoading: false,
 
-    initializeWebSocket: (userId) => {
-      const client = new Client({
-        brokerURL: 'ws://localhost:8088/ws',
-        reconnectDelay: 5000,
-        heartbeatIncoming: 4000,
-        heartbeatOutgoing: 4000,
-        onConnect: () => {
-          set({ isConnected: true });
-          
-          // Subscribe to user's private queue
-          client.subscribe(`/user/${userId}/queue/messages`, (message: IMessage) => {
-            const notification = JSON.parse(message.body);
-            const newMessage: ChatMessage = {
-              id: notification.id,
-              chatId: `${notification.senderId}-${notification.recipientId}`,
-              senderId: notification.senderId,
-              recipientId: notification.recipientId,
-              content: notification.content,
-              timestamp: new Date(),
-              status: 'delivered'
-            };
+  
+
+  initializeChat: async (userId: string) => {
+    set({ isLoading: true });
+    try {
+      await chatService.connect(userId);
+      
+      // Set up message listener
+      chatService.onMessageReceived((notification: ChatNotification) => {
+        const newMessage: ChatMessage = {
+          id: notification.id,
+          chatId: `${notification.senderId}_${notification.recipientId}`,
+          senderId: notification.senderId,
+          recipientId: notification.recipientId,
+          content: notification.content,
+          timestamp: new Date(),
+        };
+        console.log('New message received:', newMessage);
+        
+        get().addMessage(newMessage);
+        
+        // Update conversation with new message
+        const conversations = get().conversations;
+        const existingConversation = conversations.find(
+          conv => conv.participantId === notification.senderId
+        );
+        
+        if (existingConversation) {
+          set({
+            conversations: conversations.map(conv =>
+              conv.participantId === notification.senderId
+                ? {
+                    ...conv,
+                    lastMessage: notification.content,
+                    lastMessageTime: 'Just now',
+                    unreadCount: conv.id === get().selectedConversation ? 0 : conv.unreadCount + 1,
+                  }
+                : conv
+            ),
             
-            set((state) => ({
-              messages: [...state.messages, newMessage],
-              conversations: state.conversations.map(conv => 
-                conv.participant.id === notification.senderId
-                  ? { ...conv, lastMessage: notification.content, unreadCount: conv.unreadCount + 1 }
-                  : conv
-              )
-            }));
           });
-
-          // Subscribe to public user updates
-          client.subscribe('/user/public', (message: IMessage) => {
-            const userUpdate = JSON.parse(message.body);
-            set((state) => ({
-              conversations: state.conversations.map(conv =>
-                conv.participant.id === userUpdate.id
-                  ? { ...conv, participant: { ...conv.participant, online: userUpdate.status === 'ONLINE' } }
-                  : conv
-              )
-            }));
-          });
-        },
-        onDisconnect: () => {
-          set({ isConnected: false });
-        },
-        onStompError: (frame) => {
-          console.error('WebSocket error:', frame.headers.message);
         }
       });
-
-      client.activate();
-      set({ client });
-    },
-
-    disconnectWebSocket: () => {
-      const { client } = get();
-      if (client) {
-        client.deactivate();
-      }
-      set({ client: null, isConnected: false });
-    },
-
-    sendMessage: async (message) => {
-      const { client } = get();
-      if (client && client.connected) {
-        try {
-          // Optimistic update
-          const optimisticMessage: ChatMessage = {
-            ...message,
-            id: Date.now().toString(),
-            timestamp: new Date(),
-            status: 'sent'
-          };
-          
-          set((state) => ({
-            messages: [...state.messages, optimisticMessage],
-            conversations: state.conversations.map(conv =>
-              conv.id === message.recipientId
-                ? { ...conv, lastMessage: message.content }
-                : conv
-            )
-          }));
-
-          // Send via WebSocket
-          client.publish({
-            destination: '/app/chat',
-            body: JSON.stringify(message)
-          });
-        } catch (error) {
-          console.error('Error sending message:', error);
-        }
-      }
-    },
-
-    setCurrentConversation: (conversationId) => {
-      set({ currentConversation: conversationId });
-      get().markMessagesAsRead(conversationId);
-    },
-
-    markMessagesAsRead: (conversationId) => {
-      set((state) => ({
-        messages: state.messages.map(msg =>
-          msg.senderId === conversationId && msg.status !== 'read'
-            ? { ...msg, status: 'read' }
-            : msg
-        ),
-        conversations: state.conversations.map(conv =>
-          conv.id === conversationId
-            ? { ...conv, unreadCount: 0 }
-            : conv
-        )
-      }));
-    },
-
-    fetchConversations: async () => {
-      try {
-        const response = await axios.get('http://localhost:8088/users');
-        const users = await response.data;
-        
-        const conversations = users.map((user: any) => ({
-          id: user.id,
-          participant: {
-            id: user.id,
-            name: user.name,
-            avatar: user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=random`,
-            online: user.status === 'ONLINE'
-          },
-          lastMessage: '',
-          unreadCount: 0,
-          project: 'Active Project' // You can modify this based on your data
-        }));
-        
-        set({ conversations });
-      } catch (error) {
-        console.error('Failed to fetch conversations:', error);
-      }
-    },
-
-    fetchMessages: async (senderId, recipientId) => {
-      try {
-        const response = await axios.get(
-          `http://localhost:8088/messages/${senderId}/${recipientId}`
-        );
-        const messages = response.data.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
-          status: 'delivered'
-        }));
-        set({ messages });
-      } catch (error) {
-        console.error('Failed to fetch messages:', error);
-      }
+      console.log('Chat initialized successfully');
+      
+      set({ isConnected: true });
+    } catch (error) {
+      console.error('Failed to initialize chat:', error);
+    } finally {
+      set({ isLoading: false });
     }
-  }))
-);
+  },
+
+  selectConversation: (conversationId: string) => {
+    set({ selectedConversation: conversationId });
+    
+    // Mark conversation as read
+    const conversations = get().conversations;
+    set({
+      conversations: conversations.map(conv =>
+        conv.id === conversationId
+          ? { ...conv, unreadCount: 0 }
+          : conv
+      ),
+    });
+    console.log('Conversation selected:', conversationId);
+  },
+
+  sendMessage: (recipientId: string, content: string) => {
+    const state = get();
+    if (!state.isConnected) return;
+
+    // You'll need to get the current user ID from your auth store
+    // ✅ Get actual userId from AuthStore
+  const senderId = useAuthStore.getState().user?.userId;
+  if (!senderId) return;
+    
+    chatService.sendMessage({
+      senderId,
+      recipientId,
+      content,
+    });
+
+    console.log('Message sent:', { senderId, recipientId, content });
+
+    // Add message to local state immediately for better UX
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      chatId: `${senderId}_${recipientId}`,
+      senderId,
+      recipientId,
+      content,
+      timestamp: new Date(),
+    };
+    
+    get().addMessage(newMessage);
+  },
+
+  loadMessages: async (senderId: string, recipientId: string) => {
+    const messages = await chatService.getChatMessages(senderId, recipientId);
+    const conversationId = `${senderId}_${recipientId}`;
+    
+    set({
+      messages: {
+        ...get().messages,
+        [conversationId]: messages,
+      },
+    });
+  },
+
+  
+
+  addMessage: (message: ChatMessage) => {
+    const conversationId = message.chatId;
+    const currentMessages = get().messages[conversationId] || [];
+    
+    set({
+      messages: {
+        ...get().messages,
+        [conversationId]: [...currentMessages, message],
+      },
+    });
+    console.log('Message added to state:', message);
+  },
+
+  startConversation: (participantId: string, participantName: string, participantAvatar: string) => {
+
+    const userId = useAuthStore.getState().user?.userId;
+    if (!userId) return;
+      const conversations = get().conversations;
+      const existingConversation = conversations.find(conv => conv.participantId === participantId);
+    
+    if (!existingConversation) {
+      const newConversation: Conversation = {
+        id: `${userId}_${participantId}`, 
+        participantId,
+        participantName,
+        participantAvatar,
+        unreadCount: 0,
+        online: false, // You might want to implement online status
+      };
+      
+      set({
+        conversations: [...conversations, newConversation],
+      });
+    }
+    
+    // Navigate to messages page and select this conversation
+    const conversationId = existingConversation?.id || `${userId}_${participantId}`;
+    set({ selectedConversation: conversationId });
+    
+  },
+
+  disconnect: () => {
+    chatService.disconnect();
+    set({ isConnected: false });
+  },
+  
+}));
