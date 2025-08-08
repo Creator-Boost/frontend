@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff,Loader } from 'lucide-react';
+import {FcGoogle} from "react-icons/fc";
+import {FaGithub} from "react-icons/fa";
 import { useAuthStore } from '../../context/store/authStore';
 import toast from 'react-hot-toast';
 
 const LoginPage: React.FC = () => {
+  const backendUrl = "http://localhost:8081/api/v1";
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -69,6 +72,14 @@ const LoginPage: React.FC = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const loginWithGoogle = () => {
+    window.location.href = `${backendUrl}/oauth2/authorization/google`;
+  };
+
+  const loginWithGithub = () => {
+    window.location.href = `${backendUrl}/oauth2/authorization/github`;
   };
 
   return (
@@ -179,11 +190,13 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                Google
+              <button onClick={loginWithGoogle} className="w-full inline-flex justify-center py-2 px-4 gap-1 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+               <FcGoogle className='w-5 h-5'/> 
+                  Google
               </button>
-              <button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                Facebook
+              <button onClick={loginWithGithub} className="w-full inline-flex justify-center py-2 px-4 gap-1 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+               <FaGithub className='w-5 h-5'/> 
+                  Github
               </button>
             </div>
           </div>
