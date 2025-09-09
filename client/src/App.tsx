@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import LoadingScreen from './components/LoadingPage';
 import UsersList from './pages/users';
 import { useChatStore } from './context/store/chatStore';
+import Chatbot from './components/Chatbot';
 
 function App() {
   const { isCheckingAuth, checkAuth } = useAuthStore();
@@ -63,6 +64,7 @@ function App() {
 
           </Routes>
            <Toaster />
+           <Chatbot />
         </div>
       </Router>
     </UserProvider>
