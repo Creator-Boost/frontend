@@ -1,5 +1,4 @@
-
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from "react-hot-toast";
 import Header from './components/Header';
 import HomePage from './pages/HomePage';
@@ -22,6 +21,26 @@ import UsersList from './pages/users';
 import { useChatStore } from './context/store/chatStore';
 import Chatbot from './components/Chatbot';
 
+// Wrapper to handle conditional header + chatbot
+function Layout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const hideHeaderAndChat = [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password/:token",
+    "/verify-email",
+  ].includes(location.pathname);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {!hideHeaderAndChat && <Header />}
+      {children}
+      {!hideHeaderAndChat && <Chatbot />}
+    </div>
+  );
+}
+
 function App() {
   const { isCheckingAuth, checkAuth } = useAuthStore();
   const [isAnimationDone, setIsAnimationDone] = useState(false);
@@ -41,11 +60,11 @@ function App() {
   }, [disconnect]);
 
   if (isCheckingAuth || !isAnimationDone) return <LoadingScreen />;
+
   return (
     <UserProvider>
       <Router>
-        <div className="min-h-screen bg-gray-50">
-          <Header  />
+        <Layout>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -60,15 +79,11 @@ function App() {
             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/users" element={<UsersList />} />
-
-
           </Routes>
-           <Toaster />
-           <Chatbot />
-        </div>
+          <Toaster />
+        </Layout>
       </Router>
     </UserProvider>
   );
 }
-
 export default App;
