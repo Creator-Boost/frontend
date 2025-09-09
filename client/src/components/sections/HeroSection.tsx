@@ -44,7 +44,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             )}
             {titleParts[1]}
           </h1>
-          <p className={`text-xl text-gray-600 mb-8 max-w-3xl mx-auto`}>
+          <p className={`text-xl text-gray-600 mb-8 tracking-widest max-w-3xl mx-auto`}>
             {description}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

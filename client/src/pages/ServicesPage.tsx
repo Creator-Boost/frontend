@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Filter, SlidersHorizontal } from 'lucide-react';
 import ServiceCard from '../components/ServiceCard';
 import { Service } from '../types/Service';
+import Footer from '../components/footer';
 
 const ServicesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -341,6 +342,7 @@ const ServicesPage: React.FC = () => {
           </div>
         </div>
       </div>
+      <Footer/>
     </div>
   );
 };

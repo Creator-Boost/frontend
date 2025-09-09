@@ -388,21 +388,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   // Add to your useAuthStore implementation
-getAllUsers: async () => {
-  set({ isLoading: true, error: null });
-  try {
-    const response = await axios.get<ProfileResponse[]>(`${API_URL}/users`);
-    set({ isLoading: false });
-    return response.data;
-  } catch (err: unknown) {
-    const error = err as AxiosError<{ message: string }>;
-    set({
-      error: error.response?.data?.message || "Error fetching users",
-      isLoading: false,
-    });
-    throw error;
-  }
-},
+	getAllUsers: async () => {
+	set({ isLoading: true, error: null });
+	try {
+		const response = await axios.get<ProfileResponse[]>(`${API_URL}/users`);
+		set({ isLoading: false });
+		return response.data;
+	} catch (err: unknown) {
+		const error = err as AxiosError<{ message: string }>;
+		set({
+		error: error.response?.data?.message || "Error fetching users",
+		isLoading: false,
+		});
+		throw error;
+	}
+	},
 
 	// Add to your useAuthStore implementation
 	getProfileById: async (userId: string) => {
