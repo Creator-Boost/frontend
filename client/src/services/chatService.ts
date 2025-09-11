@@ -1,5 +1,6 @@
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { Conversation } from '../context/store/chatStore';
 
 export interface ChatMessage {
   id: string;
@@ -99,6 +100,12 @@ class ChatService {
       console.error('Error fetching chat messages:', error);
       return [];
     }
+  }
+
+  async getConversations(userId: string): Promise<Conversation[]> {
+    const response = await fetch(`http://localhost:8080/conversations/${userId}`);
+    console.log('Fetch conversations response:', response); 
+    return await response.json();
   }
 }
 
