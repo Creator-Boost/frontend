@@ -41,7 +41,7 @@ export default function Chatbot() {
     setIsTyping(true);
 
     try {
-      const res = await fetch("http://localhost:8080/api/chat", {
+      const res = await fetch("http://localhost:8088/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ msg: input }),

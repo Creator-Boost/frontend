@@ -3,7 +3,6 @@ import { Search, Send, Paperclip, MoreVertical, Loader } from 'lucide-react';
 import { useAuthStore } from '../../context/store/authStore';
 import { useChatStore } from '../../context/store/chatStore';
 
-
 const MessagesPage: React.FC = () => {
   const { user } = useAuthStore();
   const {
@@ -26,21 +25,17 @@ const MessagesPage: React.FC = () => {
   useEffect(() => {
     if (user?.userId && !isConnected) {
       initializeChat(user.userId);
-      
     }
   }, [user?.userId, isConnected, initializeChat]);
 
   // Load messages when conversation is selected
   useEffect(() => {
     if (selectedConversation && user?.userId) {
-      
-      const conversation = conversations.find(conv => conv.id === selectedConversation);
+      const conversation = conversations.find((conv) => conv.id === selectedConversation);
       if (conversation) {
         loadMessages(user.userId, conversation.participantId);
       }
-      
     }
-    console.log('Loading messages for conversation:', selectedConversation);
   }, [selectedConversation, user?.userId, conversations, loadMessages]);
 
   // Scroll to bottom when new messages arrive
@@ -48,13 +43,31 @@ const MessagesPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, selectedConversation]);
 
-  const selectedConversationData = conversations.find(conv => conv.id === selectedConversation);
-  const conversationMessages = selectedConversation ? messages[`${user?.userId}_${selectedConversationData?.participantId}`] || [] : [];
+  const selectedConversationData = conversations.find((conv) => conv.id === selectedConversation);
 
-  const filteredConversations = conversations.filter(conversation =>
-    conversation.participantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (conversation.lastMessage && conversation.lastMessage.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Sort messages inside conversation
+  const conversationMessages = selectedConversation
+    ? (messages[`${user?.userId}_${selectedConversationData?.participantId}`] || []).sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+    : [];
+
+  // Filter conversations by search term
+  const filteredConversations = conversations.filter(
+    (conversation) =>
+      conversation.participantName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (conversation.lastMessage &&
+        conversation.lastMessage.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // Sort conversations by last message time (descending)
+  const sortedConversations = filteredConversations
+    .slice()
+    .sort((a, b) => {
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
+      return timeB - timeA;
+    });
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +77,7 @@ const MessagesPage: React.FC = () => {
     }
   };
 
-  const formatMessageTime = (timestamp: Date) => {
+  const formatMessageTime = (timestamp: Date | string) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -95,7 +108,10 @@ const MessagesPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden" style={{ height: 'calc(100vh - 8rem)' }}>
+        <div
+          className="bg-white rounded-lg shadow-sm overflow-hidden"
+          style={{ height: 'calc(100vh - 8rem)' }}
+        >
           <div className="flex h-full">
             {/* Conversations List */}
             <div className="w-1/3 border-r border-gray-200 flex flex-col">
@@ -130,60 +146,80 @@ const MessagesPage: React.FC = () => {
 
               {/* Conversations */}
               <div className="flex-1 overflow-y-auto">
-                {filteredConversations.length === 0 ? (
+                {sortedConversations.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">
                     {conversations.length === 0 ? (
                       <div>
                         <p className="mb-2">No conversations yet</p>
-                        <p className="text-sm">Visit a profile and click "Contact Me" to start chatting</p>
+                        <p className="text-sm">
+                          Visit a profile and click "Contact Me" to start chatting
+                        </p>
                       </div>
                     ) : (
                       <p>No conversations match your search</p>
                     )}
                   </div>
                 ) : (
-                  filteredConversations.map((conversation) => (
-                    <div
-                      key={conversation.id}
-                      onClick={() => selectConversation(conversation.id)}
-                      className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
-                        selectedConversation === conversation.id
-                          ? 'bg-emerald-50 border-l-4 border-l-emerald-500'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <div className="relative">
-                          <img
-                            src={conversation.participantAvatar}
-                            alt={conversation.participantName}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                          {conversation.online && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                          )}
-                        </div>
-                        <div className="ml-3 flex-1 min-w-0">
-                          <div className="flex justify-between items-start">
-                            <h3 className="text-sm font-medium text-gray-900 truncate">
-                              {conversation.participantName}
-                            </h3>
-                            {conversation.lastMessageTime && (
-                              <span className="text-xs text-gray-500">{conversation.lastMessageTime}</span>
+                  sortedConversations.map((conversation) => {
+                    // Find last message from messages state (more reliable than store's lastMessage)
+                    const messageKey = `${user?.userId}_${conversation.participantId}`;
+                    const convMessages = messages[messageKey] || [];
+                    const lastMessage = convMessages.length > 0
+                        ? convMessages[convMessages.length - 1]
+                        : conversation.lastMessage
+                        ? { content: conversation.lastMessage, timestamp: conversation.lastMessageTime }
+                        : null;
+                        
+                    return (
+                      <div
+                        key={conversation.id}
+                        onClick={() => selectConversation(conversation.id)}
+                        className={`p-4 border-b border-gray-100 cursor-pointer transition-colors ${
+                          selectedConversation === conversation.id
+                            ? 'bg-emerald-50 border-l-4 border-l-emerald-500'
+                            : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          <div className="relative">
+                            <img
+                              src={
+                                conversation.participantAvatar ||
+                                'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
+                              }
+                              alt={conversation.participantName}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                            {conversation.online && (
+                              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                             )}
                           </div>
-                          {conversation.lastMessage && (
-                            <p className="text-sm text-gray-600 truncate mt-1">{conversation.lastMessage}</p>
+                          <div className="ml-3 flex-1 min-w-0">
+                            <div className="flex justify-between items-start">
+                              <h3 className="text-sm font-medium text-gray-900 truncate">
+                                {conversation.participantName}
+                              </h3>
+                              {lastMessage?.timestamp && (
+                                <span className="text-xs text-gray-500">
+                                  {formatMessageTime(lastMessage.timestamp)}
+                                </span>
+                              )}
+                            </div>
+                            {lastMessage && (
+                              <p className="text-sm text-gray-600 truncate mt-1">
+                                {lastMessage.content}
+                              </p>
+                            )}
+                          </div>
+                          {conversation.unreadCount > 0 && (
+                            <div className="ml-2 bg-emerald-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
+                              {conversation.unreadCount}
+                            </div>
                           )}
                         </div>
-                        {conversation.unreadCount > 0 && (
-                          <div className="ml-2 bg-emerald-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                            {conversation.unreadCount}
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -198,7 +234,10 @@ const MessagesPage: React.FC = () => {
                       <div className="flex items-center">
                         <div className="relative">
                           <img
-                            src={selectedConversationData.participantAvatar}
+                            src={
+                              selectedConversationData.participantAvatar ||
+                              'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
+                            }
                             alt={selectedConversationData.participantName}
                             className="w-10 h-10 rounded-full object-cover"
                           />
@@ -207,7 +246,9 @@ const MessagesPage: React.FC = () => {
                           )}
                         </div>
                         <div className="ml-3">
-                          <h3 className="text-lg font-medium text-gray-900">{selectedConversationData.participantName}</h3>
+                          <h3 className="text-lg font-medium text-gray-900">
+                            {selectedConversationData.participantName}
+                          </h3>
                           <p className="text-sm text-gray-600">
                             {selectedConversationData.online ? 'Online' : 'Offline'}
                           </p>
@@ -224,34 +265,53 @@ const MessagesPage: React.FC = () => {
                     {conversationMessages.length === 0 ? (
                       <div className="text-center text-gray-500 mt-8">
                         <p className="mb-2">No messages yet</p>
-                        <p className="text-sm">Start the conversation by sending a message below</p>
+                        <p className="text-sm">
+                          Start the conversation by sending a message below
+                        </p>
                       </div>
                     ) : (
                       conversationMessages.map((message) => (
                         <div
                           key={message.id}
-                          className={`flex ${message.senderId === user?.userId ? 'justify-end' : 'justify-start'}`}
+                          className={`flex ${
+                            message.senderId === user?.userId
+                              ? 'justify-end'
+                              : 'justify-start'
+                          }`}
                         >
-                          <div className={`flex items-end space-x-2 max-w-xs lg:max-w-md ${
-                            message.senderId === user?.userId ? 'flex-row-reverse space-x-reverse' : ''
-                          }`}>
+                          <div
+                            className={`flex items-end space-x-2 max-w-xs lg:max-w-md ${
+                              message.senderId === user?.userId
+                                ? 'flex-row-reverse space-x-reverse'
+                                : ''
+                            }`}
+                          >
                             <img
-                              src={message.senderId === user?.userId 
-                                ? user.imageUrl || 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
-                                : selectedConversationData.participantAvatar
+                              src={
+                                message.senderId === user?.userId
+                                  ? user.imageUrl ||
+                                    'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
+                                  : selectedConversationData.participantAvatar ||
+                                    'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400'
                               }
                               alt="Avatar"
                               className="w-8 h-8 rounded-full object-cover"
                             />
-                            <div className={`px-4 py-2 rounded-lg ${
-                              message.senderId === user?.userId
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-gray-200 text-gray-900'
-                            }`}>
+                            <div
+                              className={`px-4 py-2 rounded-lg ${
+                                message.senderId === user?.userId
+                                  ? 'bg-emerald-500 text-white'
+                                  : 'bg-gray-200 text-gray-900'
+                              }`}
+                            >
                               <p className="text-sm">{message.content}</p>
-                              <p className={`text-xs mt-1 ${
-                                message.senderId === user?.userId ? 'text-emerald-100' : 'text-gray-500'
-                              }`}>
+                              <p
+                                className={`text-xs mt-1 ${
+                                  message.senderId === user?.userId
+                                    ? 'text-emerald-100'
+                                    : 'text-gray-500'
+                                }`}
+                              >
                                 {formatMessageTime(message.timestamp)}
                               </p>
                             </div>
@@ -265,10 +325,7 @@ const MessagesPage: React.FC = () => {
                   {/* Message Input */}
                   <div className="p-4 border-t border-gray-200 bg-white">
                     <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
-                      <button
-                        type="button"
-                        className="p-2 text-gray-400 hover:text-gray-600"
-                      >
+                      <button type="button" className="p-2 text-gray-400 hover:text-gray-600">
                         <Paperclip className="h-5 w-5" />
                       </button>
                       <input
@@ -297,8 +354,12 @@ const MessagesPage: React.FC = () => {
               ) : (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No conversation selected</h3>
-                    <p className="text-gray-600">Choose a conversation from the list to start messaging</p>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No conversation selected
+                    </h3>
+                    <p className="text-gray-600">
+                      Choose a conversation from the list to start messaging
+                    </p>
                   </div>
                 </div>
               )}

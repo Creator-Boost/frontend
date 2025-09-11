@@ -44,6 +44,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ isLoading: true });
     try {
       await chatService.connect(userId);
+
+      // Fetch previous conversations
+      const previousConversations = await chatService.getConversations(userId);
+      console.log('Previous conversations:', previousConversations);
+      //set({ conversations: previousConversations });
+      set({ conversations: Array.isArray(previousConversations) ? previousConversations : [] });
       
       // Set up message listener
       chatService.onMessageReceived((notification: ChatNotification) => {
@@ -167,7 +173,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     const userId = useAuthStore.getState().user?.userId;
     if (!userId) return;
-      const conversations = get().conversations;
+      const conversations = Array.isArray(get().conversations) ? get().conversations : [];
       const existingConversation = conversations.find(conv => conv.participantId === participantId);
     
     if (!existingConversation) {

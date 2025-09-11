@@ -42,7 +42,7 @@ const PlatformsScrollingSection = () => {
   ];
 
   return (
-    <section className="py-16 bg-gradient-to-b from-emerald-50/50 to-white">
+    <section className="py-8 bg-gradient-to-b from-emerald-50/50 to-white">
       <div className="mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
@@ -53,6 +53,23 @@ const PlatformsScrollingSection = () => {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Get expert help for every social media platform you use
           </p>
+        </div>
+
+        {/* Second Row - Names */}
+        <div className="relative flex w-full overflow-hidden ">
+          <VelocityScroll 
+            defaultVelocity={-5}
+            speedMultiplier={0.6}
+            smoothness={0.8}
+            className="text-2xl md:text-3xl font-normal text-gray-800"
+            numRows={1}
+          >
+            {platforms.map((platform) => (
+              <span key={`name-${platform.name}`} className={`mx-8 text-black tracking-widest `}>
+                {platform.name} 
+              </span>
+            ))}
+          </VelocityScroll>
         </div>
 
         {/* First Row - Icons */}
@@ -74,22 +91,7 @@ const PlatformsScrollingSection = () => {
           </VelocityScroll>
         </div>
 
-        {/* Second Row - Names */}
-        <div className="relative flex w-full overflow-hidden ">
-          <VelocityScroll 
-            defaultVelocity={-5}
-            speedMultiplier={0.6}
-            smoothness={0.8}
-            className="text-2xl md:text-3xl font-normal text-gray-800"
-            numRows={1}
-          >
-            {platforms.map((platform) => (
-              <span key={`name-${platform.name}`} className={`mx-8 text-black tracking-widest `}>
-                {platform.name} 
-              </span>
-            ))}
-          </VelocityScroll>
-        </div>
+        
 
         
       </div>
