@@ -14,6 +14,8 @@ import { UserProvider } from './context/UserContext';
 import EmailVerificationPage from './pages/auth/EmailVerificationPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
+import PaymentFailurePage from './pages/payment/PaymentFailurePage';
 import { useAuthStore } from './context/store/authStore';
 import { useEffect, useState } from 'react';
 import LoadingScreen from './components/LoadingPage';
@@ -30,6 +32,8 @@ function Layout({ children }: { children: React.ReactNode }) {
     "/forgot-password",
     "/reset-password/:token",
     "/verify-email",
+    "/payment/success",
+    "/payment/failure",
   ].includes(location.pathname);
 
   return (
@@ -79,6 +83,8 @@ function App() {
             <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/users" element={<UsersList />} />
+            <Route path="/payment/success" element={<PaymentSuccessPage />} />
+            <Route path="/payment/failure" element={<PaymentFailurePage />} />
           </Routes>
           <Toaster />
         </Layout>
