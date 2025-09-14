@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Star, Clock, CheckCircle, ArrowLeft, MessageCircle, Shield, RefreshCw, Award } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Star, Clock, CheckCircle, ArrowLeft, MessageCircle, Shield, RefreshCw, Award, Play } from 'lucide-react';
 import { Service } from '../types/Service';
+import { usePaymentStore } from '../context/store/paymentStore';
+import { useAuthStore } from '../context/store/authStore';
+import PaymentButton from '../components/PaymentButton';
+import toast from 'react-hot-toast';
 
 const ServiceDetailPage: React.FC = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [selectedPackage, setSelectedPackage] = useState(0);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [hasPurchased, setHasPurchased] = useState(false);
+  
+  const { user, isAuthenticated } = useAuthStore();
+  const { hasUserPurchasedService, fetchUserPurchases } = usePaymentStore();
+
+  // Check if user has purchased this service
+  useEffect(() => {
+    if (isAuthenticated && id) {
+      fetchUserPurchases();
+      const purchased = hasUserPurchasedService(id);
+      setHasPurchased(purchased);
+    }
+  }, [isAuthenticated, id, fetchUserPurchases, hasUserPurchasedService]);
 
   // Mock service data - in real app, this would come from API
   const service: Service = {
@@ -292,13 +310,38 @@ const ServiceDetailPage: React.FC = () => {
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                <button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold transition-colors">
-                  Continue (${service.packages[selectedPackage].price})
-                </button>
-                <button className="w-full border border-emerald-500 text-emerald-600 hover:bg-emerald-50 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
-                  <MessageCircle className="h-5 w-5" />
-                  Contact Seller
-                </button>
+                {hasPurchased ? (
+                  <>
+                    <button 
+                      onClick={() => navigate(`/service/${id}`)}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Play className="h-5 w-5" />
+                      Access Course
+                    </button>
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-center">
+                      <p className="text-emerald-700 text-sm font-medium">
+                        ✓ You have access to this course
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <PaymentButton
+                      serviceId={service.id}
+                      serviceTitle={service.title}
+                      packageName={service.packages[selectedPackage].name}
+                      amount={service.packages[selectedPackage].price}
+                      className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      Continue (${service.packages[selectedPackage].price})
+                    </PaymentButton>
+                    <button className="w-full border border-emerald-500 text-emerald-600 hover:bg-emerald-50 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
+                      <MessageCircle className="h-5 w-5" />
+                      Contact Seller
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Trust Badges */}
