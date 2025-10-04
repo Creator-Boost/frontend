@@ -45,9 +45,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({
             )}
             {titleParts[1]}
           </h1>
-          <p className={`text-xl text-gray-600 mb-8 tracking-widest max-w-3xl mx-auto`}>
+          <div className={`text-xl text-gray-600 mb-8 tracking-widest max-w-3xl mx-auto`}>
              <TextGenerateEffect words={description} />
-          </p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             {primaryButton && (
               <Link
