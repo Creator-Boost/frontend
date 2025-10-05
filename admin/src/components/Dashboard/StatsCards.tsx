@@ -1,11 +1,28 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Users, Briefcase, Calendar, DollarSign } from 'lucide-react';
+import { useAdminAuthStore } from '../../context/useAdminAuthStore';
 
 const StatsCards: React.FC = () => {
+
+  const getAllUsers = useAdminAuthStore((state) => state.getAllUsers);
+  const [totalUsers, setTotalUsers] = useState(0);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const users = await getAllUsers();
+        setTotalUsers(users.length); // dynamically set total users
+      } catch (err) {
+        console.error('Failed to fetch total users', err);
+      }
+    };
+    fetchUsers();
+  }, [getAllUsers]);
+
   const stats = [
     {
       title: 'Total Users',
-      value: '12,584',
+      value: totalUsers.toLocaleString(), // dynamic value
       change: '+12.5%',
       changeType: 'positive',
       icon: Users,

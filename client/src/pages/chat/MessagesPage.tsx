@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Send, Paperclip, MoreVertical, Loader } from 'lucide-react';
 import { useAuthStore } from '../../context/store/authStore';
 import { useChatStore } from '../../context/store/chatStore';
+import { useNavigate } from 'react-router-dom';
 
 const MessagesPage: React.FC = () => {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
   const {
     conversations,
     selectedConversation,
@@ -231,7 +233,7 @@ const MessagesPage: React.FC = () => {
                   {/* Chat Header */}
                   <div className="p-4 border-b border-gray-200 bg-white">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center">
+                      <div className="flex items-center cursor-pointer" onClick={() => navigate(`/profile/${selectedConversationData.participantId}`)}>
                         <div className="relative">
                           <img
                             src={
@@ -240,13 +242,14 @@ const MessagesPage: React.FC = () => {
                             }
                             alt={selectedConversationData.participantName}
                             className="w-10 h-10 rounded-full object-cover"
+                            
                           />
                           {selectedConversationData.online && (
                             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                           )}
                         </div>
                         <div className="ml-3">
-                          <h3 className="text-lg font-medium text-gray-900">
+                          <h3 className="text-lg font-medium text-gray-900" >
                             {selectedConversationData.participantName}
                           </h3>
                           <p className="text-sm text-gray-600">

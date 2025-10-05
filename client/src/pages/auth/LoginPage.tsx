@@ -7,7 +7,7 @@ import { useAuthStore } from "../../context/store/authStore";
 import toast from "react-hot-toast";
 
 const LoginPage: React.FC = () => {
-  const backendUrl = "http://localhost:8081/api/v1";
+  const backendUrl = "http://localhost:8081";
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: "", password: "" });
   const { login, sendVerifyOtp, error, isLoading, message } = useAuthStore();

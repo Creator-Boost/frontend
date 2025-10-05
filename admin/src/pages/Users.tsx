@@ -1,100 +1,98 @@
-import React, { useState } from 'react';
-import { Search, Filter, MoreHorizontal, Ban, CheckCircle, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, MoreHorizontal, Ban, CheckCircle, Trash2, Loader } from 'lucide-react';
+import { useAdminAuthStore } from '../context/useAdminAuthStore';
+
+interface User {
+  userId: string;
+  name: string;
+  email: string;
+  role: 'client' | 'provider' | string;
+  status?: 'active' | 'suspended';
+  joinDate: string;
+  totalSpent?: string;
+  totalEarned?: string;
+  avatar: string;
+}
 
 const Users: React.FC = () => {
   const [filterRole, setFilterRole] = useState<'all' | 'client' | 'provider' | 'suspended'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const users = [
-    {
-      id: 1,
-      name: 'Sarah Johnson',
-      email: 'sarah@example.com',
-      role: 'client',
-      status: 'active',
-      joinDate: '2024-12-15',
-      totalSpent: '$1,250',
-      avatar: 'SJ',
-    },
-    {
-      id: 2,
-      name: 'Alex Digital',
-      email: 'alex@creativestudio.com',
-      role: 'provider',
-      status: 'active',
-      joinDate: '2024-11-20',
-      totalEarned: '$3,890',
-      avatar: 'AD',
-    },
-    {
-      id: 3,
-      name: 'Mike Chen',
-      email: 'mike.chen@email.com',
-      role: 'client',
-      status: 'active',
-      joinDate: '2024-12-01',
-      totalSpent: '$450',
-      avatar: 'MC',
-    },
-    {
-      id: 4,
-      name: 'Emma Wilson',
-      email: 'emma@copyexpert.com',
-      role: 'provider',
-      status: 'suspended',
-      joinDate: '2024-10-15',
-      totalEarned: '$2,100',
-      avatar: 'EW',
-    },
-    {
-      id: 5,
-      name: 'David Brown',
-      email: 'david.brown@gmail.com',
-      role: 'client',
-      status: 'active',
-      joinDate: '2024-09-30',
-      totalSpent: '$850',
-      avatar: 'DB',
-    },
-  ];
+  const getAllUsers = useAdminAuthStore((state) => state.getAllUsers);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getAllUsers();
+        const mappedUsers: User[] = data.map((u) => ({
+          userId: u.userId,
+          name: u.name,
+          email: u.email,
+          role: u.role.toLowerCase(),
+          status: 'active', // default placeholder
+          joinDate: u.createdAt,
+          totalSpent: '$500', // placeholder
+          totalEarned: '$1000', // placeholder
+          avatar: u.imageUrl || u.name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase(),
+        }));
+        setUsers(mappedUsers);
+      } catch (err) {
+        setError('Failed to fetch users');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, [getAllUsers]);
 
   const filteredUsers = users.filter(user => {
     const matchesRole = filterRole === 'all' || user.role === filterRole || (filterRole === 'suspended' && user.status === 'suspended');
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesRole && matchesSearch;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'suspended':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'suspended': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'client':
-        return 'bg-blue-100 text-blue-800';
-      case 'provider':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+      case 'client': return 'bg-blue-100 text-blue-800';
+      case 'provider': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
+  if (loading) return (
+    <div className="flex justify-center items-center py-20">
+      <Loader className="animate-spin w-8 h-8 text-blue-500" />
+    </div>
+  );
+
+  if (error) return <div className="text-red-500">{error}</div>;
+
   return (
     <div className="space-y-6">
+      {/* Header & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Users Management</h1>
           <p className="text-gray-600">Manage clients and providers across your platform</p>
         </div>
-        
         <div className="flex items-center space-x-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -119,9 +117,7 @@ const Users: React.FC = () => {
                 key={role}
                 onClick={() => setFilterRole(role as typeof filterRole)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
-                  filterRole === role
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  filterRole === role ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {role === 'all' ? 'All Users' : role.charAt(0).toUpperCase() + role.slice(1)}
@@ -148,11 +144,15 @@ const Users: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={user.userId} className="hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-medium text-sm">{user.avatar}</span>
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-600 overflow-hidden">
+                        {user.avatar.startsWith('http') ? (
+                          <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-white font-medium text-sm">{user.avatar}</span>
+                        )}
                       </div>
                       <div>
                         <div className="font-medium text-gray-900">{user.name}</div>
@@ -166,13 +166,11 @@ const Users: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-4 px-6">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(user.status)}`}>
-                      {user.status}
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(user.status || 'active')}`}>
+                      {user.status || 'active'}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-sm text-gray-600">
-                    {new Date(user.joinDate).toLocaleDateString()}
-                  </td>
+                  <td className="py-4 px-6 text-sm text-gray-600">{new Date(user.joinDate).toLocaleDateString()}</td>
                   <td className="py-4 px-6 text-sm text-gray-900 font-medium">
                     {user.role === 'client' ? user.totalSpent : user.totalEarned}
                   </td>

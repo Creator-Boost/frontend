@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import axios, { AxiosError } from "axios";
 
-const API_URL ="http://localhost:8081/api/v1";
+const API_URL = "http://localhost:8080/api/auth";
 
 
 

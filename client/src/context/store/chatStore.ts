@@ -3,6 +3,9 @@ import { chatService, ChatMessage, ChatNotification } from '../../services/chatS
 import { useAuthStore } from './authStore';
 
 
+
+
+
 export interface Conversation {
   id: string;
   participantId: string;

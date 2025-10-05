@@ -1,6 +1,11 @@
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { Conversation } from '../context/store/chatStore';
+import axios, { AxiosError } from "axios";
+
+const BACKEND_URL = 'http://localhost:8080/api/chat';
+
+axios.defaults.withCredentials = true;
 
 export interface ChatMessage {
   id: string;
@@ -18,6 +23,11 @@ export interface ChatNotification {
   content: string;
 }
 
+interface SockJSOptions extends SockJS.Options {
+  withCredentials?: boolean;
+}
+
+
 class ChatService {
   private stompClient: Client | null = null;
   private connected = false;
@@ -30,7 +40,9 @@ class ChatService {
         return;
       }
 
-      const socket = new SockJS('http://localhost:8080/ws');
+      const socket = new SockJS(`http://localhost:8085/ws`, null, {
+          withCredentials: true,
+        } as SockJSOptions);
       this.stompClient = new Client({
         webSocketFactory: () => socket,
         debug: (str) => {
@@ -91,7 +103,9 @@ class ChatService {
 
   async getChatMessages(senderId: string, recipientId: string): Promise<ChatMessage[]> {
     try {
-      const response = await fetch(`http://localhost:8080/messages/${senderId}/${recipientId}`);
+      const response = await fetch(`${BACKEND_URL}/messages/${senderId}/${recipientId}`, {
+        credentials: 'include', // very important
+      });
       if (!response.ok) {
         throw new Error('Failed to fetch messages');
       }
@@ -103,9 +117,15 @@ class ChatService {
   }
 
   async getConversations(userId: string): Promise<Conversation[]> {
-    const response = await fetch(`http://localhost:8080/conversations/${userId}`);
-    console.log('Fetch conversations response:', response); 
-    return await response.json();
+    try {
+      const response = await axios.get<Conversation[]>(`${BACKEND_URL}/conversations/${userId}`);
+      console.log('Fetch conversations response:', response.data);
+      return response.data;
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message: string }>;
+      console.error('Error fetching conversations:', error.response?.data?.message || error.message);
+      return [];
+    }
   }
 }
 

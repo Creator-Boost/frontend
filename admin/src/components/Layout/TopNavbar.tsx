@@ -1,13 +1,24 @@
 import React, { useState } from 'react';
 import { Search, Bell, Menu, User, Settings, LogOut } from 'lucide-react';
+import { useAdminAuthStore } from '../../context/useAdminAuthStore';
+import { useNavigate } from 'react-router-dom';
 
 interface TopNavbarProps {
   onSidebarToggle: () => void;
+  setCurrentPage: (page: string) => void; // add this
 }
 
-const TopNavbar: React.FC<TopNavbarProps> = ({ onSidebarToggle }) => {
+const TopNavbar: React.FC<TopNavbarProps> = ({ onSidebarToggle, setCurrentPage }) => {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationsCount] = useState(3);
+  const { logout, user, isLoading } = useAdminAuthStore();
+  const navigate = useNavigate();
+  console.log("user in TopNavbar:", user);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login"); // redirect to login page after logout
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
@@ -63,12 +74,20 @@ const TopNavbar: React.FC<TopNavbarProps> = ({ onSidebarToggle }) => {
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
               className="flex items-center space-x-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-white" />
-              </div>
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt={user.name || "Profile"}
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">{user?.name ? user.name.charAt(0).toUpperCase() : 'A'}</span>
+                </div>
+              )}
               <div className="hidden md:block text-left">
-                <div className="text-sm font-medium text-gray-900">John Admin</div>
-                <div className="text-xs text-gray-500">Administrator</div>
+                <div className="text-sm font-medium text-gray-900">{user?.name}</div>
+                <div className="text-xs text-gray-500">{user?.role}</div>
               </div>
             </button>
 
@@ -76,16 +95,24 @@ const TopNavbar: React.FC<TopNavbarProps> = ({ onSidebarToggle }) => {
             {profileDropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                 <div className="py-1">
-                  <button className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors">
+                  <button className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setCurrentPage("profile")}
+                  >
                     <User className="w-4 h-4" />
                     <span>Profile</span>
                   </button>
-                  <button className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors">
+                  <button className="flex items-center space-x-2 w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setCurrentPage("settings")}
+                  >
                     <Settings className="w-4 h-4" />
                     <span>Settings</span>
                   </button>
                   <hr className="my-1" />
-                  <button className="flex items-center space-x-2 w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 transition-colors">
+                  <button
+                    className="flex items-center space-x-2 w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 transition-colors"
+                    onClick={handleLogout}
+                    disabled={isLoading}
+                  >
                     <LogOut className="w-4 h-4" />
                     <span>Logout</span>
                   </button>

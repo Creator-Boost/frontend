@@ -7,7 +7,8 @@ import {
   BarChart3, 
   AlertTriangle, 
   Settings,
-  X
+  X,
+  User
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,6 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, 
     { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'disputes', label: 'Disputes', icon: AlertTriangle },
     { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'profile', label: 'Profile', icon: User },
   ];
 
   return (
