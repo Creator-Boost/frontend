@@ -1,29 +1,54 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart3, TrendingUp } from 'lucide-react';
+import { useAdminAuthStore } from '../../context/useAdminAuthStore';
+
+interface UserData {
+  month: string;
+  value: number;
+}
 
 const GrowthChart: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'revenue'>('users');
+  const [userData, setUserData] = useState<UserData[]>([]);
+  const getAllUsers = useAdminAuthStore((state) => state.getAllUsers);
 
-  const data = {
-    users: [
-      { month: 'Jan', value: 420 },
-      { month: 'Feb', value: 532 },
-      { month: 'Mar', value: 681 },
-      { month: 'Apr', value: 734 },
-      { month: 'May', value: 892 },
-      { month: 'Jun', value: 1045 },
-    ],
-    revenue: [
-      { month: 'Jan', value: 12400 },
-      { month: 'Feb', value: 15800 },
-      { month: 'Mar', value: 18900 },
-      { month: 'Apr', value: 22100 },
-      { month: 'May', value: 26700 },
-      { month: 'Jun', value: 31200 },
-    ],
-  };
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const users = await getAllUsers();
+        // Group users by month
+        const monthlyCount: Record<string, number> = {};
+        users.forEach((u) => {
+          const month = new Date(u.createdAt).toLocaleString('default', { month: 'short' });
+          monthlyCount[month] = (monthlyCount[month] || 0) + 1;
+        });
 
-  const currentData = data[activeTab];
+        // Convert to array sorted by month order
+        const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const chartData: UserData[] = monthsOrder
+          .filter((m) => monthlyCount[m])
+          .map((m) => ({ month: m, value: monthlyCount[m] }));
+
+        setUserData(chartData);
+      } catch (err) {
+        console.error('Failed to fetch users for chart', err);
+      }
+    };
+
+    fetchUsers();
+  }, [getAllUsers]);
+
+  // Hardcoded revenue data can remain
+  const revenueData = [
+    { month: 'Jan', value: 12400 },
+    { month: 'Feb', value: 15800 },
+    { month: 'Mar', value: 18900 },
+    { month: 'Apr', value: 22100 },
+    { month: 'May', value: 26700 },
+    { month: 'Jun', value: 31200 },
+  ];
+
+  const currentData = activeTab === 'users' ? userData : revenueData;
   const maxValue = Math.max(...currentData.map(d => d.value));
 
   return (

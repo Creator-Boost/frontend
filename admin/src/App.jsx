@@ -8,8 +8,13 @@ import Bookings from './pages/Bookings';
 import Reports from './pages/Reports';
 import Disputes from './pages/Disputes';
 import Settings from './pages/Settings';
+import { Routes, Route } from "react-router-dom";
+import AdminLogin from './pages/AdminLogin';
+import ProtectedRoute from './components/ProtectedRoute';
+import Profile from './pages/Profile';
 
-function App() {
+
+function AdminApp() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -29,6 +34,8 @@ function App() {
         return <Disputes />;
       case 'settings':
         return <Settings />;
+      case 'profile':
+        return <Profile />;
       default:
         return <Dashboard />;
     }
@@ -44,7 +51,10 @@ function App() {
       />
       
       <div className="flex-1 flex flex-col">
-        <TopNavbar onSidebarToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <TopNavbar
+          onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+          setCurrentPage={setCurrentPage}
+        />
         
         <main className="flex-1 p-4 md:p-6 lg:p-8">
           {renderPage()}
@@ -54,4 +64,20 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    
+      <Routes>
+        <Route path="/login" element={<AdminLogin />} />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <AdminApp />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    
+  );
+}
