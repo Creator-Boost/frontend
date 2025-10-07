@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import axios, { AxiosError } from "axios";
 
-const API_URL = "http://localhost:8080/api/auth";
-
+//const API_URL = "http://localhost:8080/api/auth";
+const API_URL = "http://localhost:8081";
 
 
 axios.defaults.withCredentials = true;

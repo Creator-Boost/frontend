@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Eye, Edit, DollarSign, TrendingUp, Users, Star, MessageCircle } from 'lucide-react';
+import { Plus, Eye, Edit, DollarSign, TrendingUp, Users, Star, MessageCircle, Database } from 'lucide-react';
+import CreateGigForm from '../../components/CreateGigForm';
+import GigListModal from '../../components/GigListModal';
 
 const ExpertDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [isCreateGigModalOpen, setIsCreateGigModalOpen] = useState(false);
+  const [isGigListModalOpen, setIsGigListModalOpen] = useState(false);
 
   const stats = [
     { label: 'Total Earnings', value: '$12,450', icon: DollarSign, color: 'text-green-600' },
@@ -149,10 +153,22 @@ const ExpertDashboard: React.FC = () => {
               <div>
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-medium text-gray-900">My Gigs</h3>
-                  <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    Create New Gig
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsGigListModalOpen(true)}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View All Gigs (DB)
+                    </button>
+                    <button 
+                      onClick={() => setIsCreateGigModalOpen(true)}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create New Gig
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -284,6 +300,23 @@ const ExpertDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Create Gig Modal */}
+      <CreateGigForm
+        isOpen={isCreateGigModalOpen}
+        onClose={() => setIsCreateGigModalOpen(false)}
+        onSubmit={(gigData) => {
+          console.log('Gig created:', gigData);
+          // You can add additional logic here like refreshing the gigs list
+          setIsCreateGigModalOpen(false);
+        }}
+      />
+
+      {/* View All Gigs Modal */}
+      <GigListModal
+        isOpen={isGigListModalOpen}
+        onClose={() => setIsGigListModalOpen(false)}
+      />
     </div>
   );
 };
