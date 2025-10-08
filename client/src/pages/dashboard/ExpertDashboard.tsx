@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Plus, Eye, Edit, DollarSign, TrendingUp, Users, Star, MessageCircle, Database } from 'lucide-react';
+import { Plus, Eye, Edit, DollarSign, TrendingUp, Users, Star } from 'lucide-react';
 import CreateGigForm from '../../components/CreateGigForm';
 import GigListModal from '../../components/GigListModal';
+import OrderList from '../../components/OrderList';
+import { useAuthStore } from '../../context/store/authStore';
 
 const ExpertDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [isCreateGigModalOpen, setIsCreateGigModalOpen] = useState(false);
   const [isGigListModalOpen, setIsGigListModalOpen] = useState(false);
+  const { user } = useAuthStore();
 
   const stats = [
     { label: 'Total Earnings', value: '$12,450', icon: DollarSign, color: 'text-green-600' },
@@ -215,68 +218,7 @@ const ExpertDashboard: React.FC = () => {
 
             {activeTab === 'orders' && (
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-6">All Orders</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Order
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Client
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Amount
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Due Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {recentOrders.map((order) => (
-                        <tr key={order.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{order.title}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{order.client}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">${order.amount}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                              order.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {order.dueDate}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button className="text-emerald-600 hover:text-emerald-900 mr-3">
-                              View
-                            </button>
-                            <button className="text-blue-600 hover:text-blue-900">
-                              <MessageCircle className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <OrderList viewType="seller" userId={user?.userId} />
               </div>
             )}
 

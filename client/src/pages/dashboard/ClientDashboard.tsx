@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Plus, Search, Clock, CheckCircle, MessageCircle } from 'lucide-react';
+import OrderList from '../../components/OrderList';
+import { useAuthStore } from '../../context/store/authStore';
 
 const ClientDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const { user } = useAuthStore();
 
   const stats = [
     { label: 'Active Orders', value: '5', icon: Clock, color: 'text-blue-600' },
@@ -178,62 +181,7 @@ const ClientDashboard: React.FC = () => {
 
             {activeTab === 'active orders' && (
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-6">Active Orders</h3>
-                <div className="space-y-6">
-                  {activeOrders.map((order) => (
-                    <div key={order.id} className="bg-white border rounded-lg p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center">
-                          <img
-                            src={order.expertAvatar}
-                            alt={order.expert}
-                            className="w-12 h-12 rounded-full mr-4"
-                          />
-                          <div>
-                            <h4 className="font-medium text-gray-900">{order.title}</h4>
-                            <p className="text-sm text-gray-600">Expert: {order.expert}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-gray-900">${order.amount}</p>
-                          <p className="text-sm text-gray-600">Due: {order.dueDate}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="mb-4">
-                        <div className="flex justify-between text-sm text-gray-600 mb-1">
-                          <span>Progress</span>
-                          <span>{order.progress}%</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-emerald-500 h-2 rounded-full"
-                            style={{ width: `${order.progress}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex justify-between items-center">
-                        <span className={`px-3 py-1 rounded-full text-sm ${
-                          order.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                          order.status === 'In Review' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {order.status}
-                        </span>
-                        <div className="flex gap-2">
-                          <button className="text-emerald-600 hover:text-emerald-800 px-3 py-1 text-sm">
-                            View Details
-                          </button>
-                          <button className="text-blue-600 hover:text-blue-800 px-3 py-1 text-sm flex items-center gap-1">
-                            <MessageCircle className="h-4 w-4" />
-                            Message
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <OrderList viewType="buyer" userId={user?.userId} />
               </div>
             )}
 
@@ -280,10 +228,7 @@ const ClientDashboard: React.FC = () => {
 
             {activeTab === 'order history' && (
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-6">Order History</h3>
-                <div className="bg-white border rounded-lg p-6">
-                  <p className="text-gray-600">Order history coming soon...</p>
-                </div>
+                <OrderList viewType="buyer" userId={user?.userId} />
               </div>
             )}
 

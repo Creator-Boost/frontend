@@ -1,10 +1,22 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8081/api/v1';
+const PAYMENT_API_URL = 'http://localhost:8086/product/v1';
 
-export interface PaymentIntent {
-  clientSecret: string;
-  paymentIntentId: string;
+// Set up axios to include credentials if needed
+axios.defaults.withCredentials = true;
+
+export interface CheckoutRequest {
+  amount: number;
+  quantity: number;
+  currency: string;
+  name: string;
+}
+
+export interface CheckoutResponse {
+  status: string;
+  message: string;
+  sessionId: string;
+  sessionUrl: string;
 }
 
 export interface PaymentResult {
@@ -26,37 +38,68 @@ export interface UserPurchase {
 
 class PaymentService {
   /**
-   * Create a payment intent for a service package
+   * Create a checkout session for a gig package
    */
-  async createPaymentIntent(
-    serviceId: string,
-    packageName: string,
-    amount: number
-  ): Promise<PaymentIntent> {
+  async createCheckoutSession(amount: number): Promise<CheckoutResponse> {
     try {
-      const response = await axios.post<PaymentIntent>(`${API_URL}/payments/create-intent`, {
-        serviceId,
-        packageName,
-        amount
+      const requestData: CheckoutRequest = {
+        amount: amount,
+        quantity: 1,
+        currency: "INR",
+        name: "gigs"
+      };
+
+      const response = await axios.post<CheckoutResponse>(`${PAYMENT_API_URL}/checkout`, requestData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+      
       return response.data;
     } catch (error) {
-      console.error('Error creating payment intent:', error);
+      console.error('Error creating checkout session:', error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to create checkout session';
+        throw new Error(errorMessage);
+      }
+      throw new Error('Failed to create checkout session');
+    }
+  }
+
+  /**
+   * Redirect user to Stripe checkout
+   */
+  redirectToCheckout(sessionUrl: string): void {
+    window.location.href = sessionUrl;
+  }
+
+  /**
+   * Handle payment success (called from success page)
+   */
+  async handlePaymentSuccess(sessionId: string, _gigId: string, _packageId: string, _buyerId: string, _requirements: string): Promise<any> {
+    try {
+      // Log the successful payment
+      console.log('Payment successful for session:', sessionId);
+      
+      // Here you could call your backend to log the successful payment
+      // or update any payment tracking if needed
+      
+      return { success: true, sessionId };
+    } catch (error) {
+      console.error('Error handling payment success:', error);
       throw error;
     }
   }
 
   /**
-   * Confirm a payment after successful Stripe processing
+   * Handle payment failure (called from failure page)
    */
-  async confirmPayment(paymentIntentId: string): Promise<PaymentResult> {
+  async handlePaymentFailure(sessionId: string, errorMessage?: string): Promise<void> {
     try {
-      const response = await axios.post<PaymentResult>(`${API_URL}/payments/confirm`, {
-        paymentIntentId
-      });
-      return response.data;
+      console.log('Payment failed for session:', sessionId, 'Error:', errorMessage);
+      // You could log this to your backend or update order status
     } catch (error) {
-      console.error('Error confirming payment:', error);
+      console.error('Error handling payment failure:', error);
       throw error;
     }
   }
@@ -66,11 +109,12 @@ class PaymentService {
    */
   async getUserPurchases(): Promise<UserPurchase[]> {
     try {
-      const response = await axios.get<UserPurchase[]>(`${API_URL}/payments/purchases`);
-      return response.data;
+      // This would need to be implemented in your backend
+      // For now, returning empty array
+      return [];
     } catch (error) {
       console.error('Error fetching user purchases:', error);
-      throw error;
+      return [];
     }
   }
 
@@ -105,43 +149,6 @@ class PaymentService {
     } catch (error) {
       console.error('Error fetching service purchase:', error);
       return null;
-    }
-  }
-
-  /**
-   * Process payment success callback from Stripe
-   */
-  async processPaymentSuccess(
-    paymentIntentId: string,
-    serviceId: string
-  ): Promise<PaymentResult> {
-    try {
-      const response = await axios.post<PaymentResult>(`${API_URL}/payments/success`, {
-        paymentIntentId,
-        serviceId
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error processing payment success:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Process payment failure callback from Stripe
-   */
-  async processPaymentFailure(
-    paymentIntentId: string,
-    errorMessage: string
-  ): Promise<void> {
-    try {
-      await axios.post(`${API_URL}/payments/failure`, {
-        paymentIntentId,
-        errorMessage
-      });
-    } catch (error) {
-      console.error('Error processing payment failure:', error);
-      throw error;
     }
   }
 }

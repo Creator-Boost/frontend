@@ -1,30 +1,41 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { XCircle, RefreshCw, Home, ArrowLeft } from 'lucide-react';
+import { paymentService } from '../../services/paymentService';
 import toast from 'react-hot-toast';
 
 const PaymentFailurePage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [orderDetails, setOrderDetails] = useState<any>(null);
   
-  // Get payment details from URL params
-  const serviceId = searchParams.get('service_id');
-  const serviceTitle = searchParams.get('service_title') || 'Service';
-  const packageName = searchParams.get('package_name') || 'Package';
-  const amount = searchParams.get('amount') || '0';
+  // Get session ID from URL params (from Stripe redirect)
+  const sessionId = searchParams.get('session_id');
   const errorMessage = searchParams.get('error') || 'Payment could not be processed';
 
   useEffect(() => {
+    // Get stored order details from localStorage
+    const pendingOrderStr = localStorage.getItem('pendingOrder');
+    if (pendingOrderStr) {
+      const pendingOrder = JSON.parse(pendingOrderStr);
+      setOrderDetails(pendingOrder);
+    }
+
+    // Handle payment failure
+    if (sessionId) {
+      paymentService.handlePaymentFailure(sessionId, errorMessage);
+    }
+
     // Show error toast
     toast.error('Payment failed. Please try again.', {
       duration: 5000,
     });
-  }, []);
+  }, [sessionId, errorMessage]);
 
   const handleRetryPayment = () => {
-    if (serviceId) {
+    if (orderDetails?.gigId) {
       // Navigate back to the service page to retry payment
-      navigate(`/service/${serviceId}`);
+      navigate(`/service/${orderDetails.gigId}`);
     } else {
       // Fallback to services page
       navigate('/services');
@@ -32,6 +43,8 @@ const PaymentFailurePage: React.FC = () => {
   };
 
   const handleGoToHome = () => {
+    // Clear the pending order since user is abandoning the purchase
+    localStorage.removeItem('pendingOrder');
     navigate('/');
   };
 
@@ -63,20 +76,28 @@ const PaymentFailurePage: React.FC = () => {
           <p className="text-red-700 text-sm mb-3">
             <strong>Error:</strong> {errorMessage}
           </p>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Service:</span>
-              <span className="font-medium text-gray-900">{serviceTitle}</span>
+          {orderDetails && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Service:</span>
+                <span className="font-medium text-gray-900">{orderDetails.gigTitle}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Package:</span>
+                <span className="font-medium text-gray-900">{orderDetails.packageName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Amount:</span>
+                <span className="font-medium text-gray-900">₹{orderDetails.amount}</span>
+              </div>
+              {sessionId && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Session ID:</span>
+                  <span className="font-medium text-gray-900 text-xs">{sessionId.substring(0, 20)}...</span>
+                </div>
+              )}
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Package:</span>
-              <span className="font-medium text-gray-900">{packageName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Amount:</span>
-              <span className="font-medium text-gray-900">${amount}</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -115,6 +136,7 @@ const PaymentFailurePage: React.FC = () => {
             <p>• Check your card details and try again</p>
             <p>• Ensure you have sufficient funds</p>
             <p>• Contact your bank if the issue persists</p>
+            <p>• Try using a different payment method</p>
           </div>
         </div>
       </div>

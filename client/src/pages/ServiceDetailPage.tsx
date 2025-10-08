@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Star, Clock, CheckCircle, ArrowLeft, MessageCircle, Shield, RefreshCw, Award, Play } from 'lucide-react';
+import { Star, Clock, CheckCircle, ArrowLeft, MessageCircle, Shield, RefreshCw, Award, Play, Loader, AlertCircle } from 'lucide-react';
 import { Service } from '../types/Service';
 import { usePaymentStore } from '../context/store/paymentStore';
 import { useAuthStore } from '../context/store/authStore';
-import PaymentButton from '../components/PaymentButton';
+import CreateOrderForm from '../components/CreateOrderForm';
+import { gigService, type Gig } from '../services/gigService';
 import toast from 'react-hot-toast';
 
 const ServiceDetailPage: React.FC = () => {
@@ -13,9 +14,72 @@ const ServiceDetailPage: React.FC = () => {
   const [selectedPackage, setSelectedPackage] = useState(0);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [hasPurchased, setHasPurchased] = useState(false);
+  const [showOrderForm, setShowOrderForm] = useState(false);
+  const [service, setService] = useState<Service | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  const { user, isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
   const { hasUserPurchasedService, fetchUserPurchases } = usePaymentStore();
+
+  // Convert Gig to Service format for compatibility with existing UI components
+  const convertGigToService = (gig: Gig): Service => {
+    const primaryImage = gig.images.find(img => img.isPrimary) || gig.images[0];
+    
+    return {
+      id: gig.id || Math.random().toString(),
+      sellerId: gig.sellerId,
+      title: gig.title,
+      description: gig.description,
+      platform: gig.platform,
+      category: gig.category,
+      status: gig.status as 'ACTIVE' | 'PAUSED' | 'DRAFT',
+      createdAt: gig.createdAt || new Date().toISOString(),
+      updatedAt: gig.updatedAt || new Date().toISOString(),
+      rating: 4.5, // Default rating - you might want to add this to your backend
+      reviews: Math.floor(Math.random() * 200) + 10, // Random reviews - replace with real data
+      expert: {
+        name: 'Expert', // You might want to fetch this from user service
+        avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+        level: 'Level 2'
+      },
+      thumbnail: primaryImage?.url || 'https://images.pexels.com/photos/4050318/pexels-photo-4050318.jpeg?auto=compress&cs=tinysrgb&w=400',
+      images: gig.images.map(img => ({ url: img.url })),
+      packages: gig.packages.map(pkg => ({
+        name: pkg.name,
+        price: pkg.price,
+        deliveryDays: pkg.deliveryDays,
+        description: pkg.description
+      })),
+      faqs: gig.faqs
+    };
+  };
+
+  // Fetch gig data from API
+  useEffect(() => {
+    const fetchGig = async () => {
+      if (!id) {
+        setError('No gig ID provided');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        const fetchedGig = await gigService.getGigById(id);
+        const convertedService = convertGigToService(fetchedGig);
+        setService(convertedService);
+      } catch (err) {
+        console.error('Error fetching gig:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch service details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGig();
+  }, [id]);
 
   // Check if user has purchased this service
   useEffect(() => {
@@ -26,68 +90,20 @@ const ServiceDetailPage: React.FC = () => {
     }
   }, [isAuthenticated, id, fetchUserPurchases, hasUserPurchasedService]);
 
-  // Mock service data - in real app, this would come from API
-  const service: Service = {
-    id: '26090e91-7d3c-42df-8838-adc00cee8ef8',
-    sellerId: 'b299b42a-1e3a-4fa6-a8bc-bad60a49e7ad',
-    title: 'Full Social Media Audit & Strategy Development',
-    description: 'I will provide a comprehensive analysis of your social media presence and create a detailed strategy to boost your engagement, followers, and overall performance. With over 5 years of experience in social media marketing, I\'ve helped hundreds of creators and businesses achieve their goals.',
-    platform: 'YouTube',
-    category: 'Audit',
-    status: 'ACTIVE',
-    createdAt: '2025-07-28T21:15:40.339469',
-    updatedAt: '2025-07-28T21:15:40.339469',
-    rating: 4.9,
-    reviews: 127,
-    expert: {
-      name: 'Sarah Johnson',
-      avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-      level: 'Top Rated'
-    },
-    thumbnail: 'https://images.pexels.com/photos/4050318/pexels-photo-4050318.jpeg?auto=compress&cs=tinysrgb&w=400',
-    images: [
-      { url: 'https://images.pexels.com/photos/4050318/pexels-photo-4050318.jpeg?auto=compress&cs=tinysrgb&w=800' },
-      { url: 'https://images.pexels.com/photos/267350/pexels-photo-267350.jpeg?auto=compress&cs=tinysrgb&w=800' },
-      { url: 'https://images.pexels.com/photos/4050296/pexels-photo-4050296.jpeg?auto=compress&cs=tinysrgb&w=800' }
-    ],
-    packages: [
-      {
-        name: 'Basic',
-        price: 50,
-        deliveryDays: 3,
-        description: 'Quick audit of your current social media presence with basic recommendations'
-      },
-      {
-        name: 'Standard',
-        price: 100,
-        deliveryDays: 5,
-        description: 'Detailed audit with content strategy and optimization recommendations'
-      },
-      {
-        name: 'Premium',
-        price: 150,
-        deliveryDays: 7,
-        description: 'Full audit & comprehensive strategy with competitor analysis and growth plan'
-      }
-    ],
-    faqs: [
-      {
-        question: 'Do you offer content planning?',
-        answer: 'Yes! The Standard and Premium packages include detailed content planning and strategy recommendations.'
-      },
-      {
-        question: 'What access do you need?',
-        answer: 'Just your public channel link and any specific goals you want to achieve. No passwords or private access required.'
-      },
-      {
-        question: 'Do you provide ongoing support?',
-        answer: 'The Premium package includes 30 days of follow-up support via messages to help implement the strategy.'
-      },
-      {
-        question: 'What platforms do you specialize in?',
-        answer: 'I specialize in YouTube, Instagram, and TikTok, with experience across all major social media platforms.'
-      }
-    ]
+  const handleContinueToOrder = () => {
+    if (!isAuthenticated) {
+      toast.error('Please log in to place an order');
+      navigate('/auth/login');
+      return;
+    }
+    setShowOrderForm(true);
+  };
+
+  const handleOrderCreated = (order: any) => {
+    toast.success(`Order created successfully! Order ID: ${order.id.substring(0, 8)}...`);
+    setShowOrderForm(false);
+    // Optionally navigate to order details or dashboard
+    navigate('/dashboard/client');
   };
 
   const reviews = [
@@ -131,7 +147,34 @@ const ServiceDetailPage: React.FC = () => {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Loader className="h-8 w-8 text-emerald-500 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Loading service details...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <AlertCircle className="h-8 w-8 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-red-800 mb-2">Error loading service</h3>
+            <p className="text-red-600 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Service Content */}
+        {!loading && !error && service && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Service Details */}
           <div className="lg:col-span-2">
             {/* Image Gallery */}
@@ -327,15 +370,12 @@ const ServiceDetailPage: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <PaymentButton
-                      serviceId={service.id}
-                      serviceTitle={service.title}
-                      packageName={service.packages[selectedPackage].name}
-                      amount={service.packages[selectedPackage].price}
+                    <button
+                      onClick={handleContinueToOrder}
                       className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white py-3 rounded-lg font-semibold transition-colors"
                     >
-                      Continue (${service.packages[selectedPackage].price})
-                    </PaymentButton>
+                      Continue to Order (${service.packages[selectedPackage].price})
+                    </button>
                     <button className="w-full border border-emerald-500 text-emerald-600 hover:bg-emerald-50 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2">
                       <MessageCircle className="h-5 w-5" />
                       Contact Seller
@@ -364,7 +404,19 @@ const ServiceDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
+
+      {/* Order Creation Modal */}
+      {service && (
+        <CreateOrderForm
+          isOpen={showOrderForm}
+          onClose={() => setShowOrderForm(false)}
+          gigId={service.id}
+          selectedPackageId={`${service.id}-${selectedPackage}`} // Generate package ID
+          onOrderCreated={handleOrderCreated}
+        />
+      )}
     </div>
   );
 };
