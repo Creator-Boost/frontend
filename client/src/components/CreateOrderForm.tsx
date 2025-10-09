@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Package, Calendar, DollarSign, FileText, AlertCircle, CreditCard } from 'lucide-react';
-import { orderService, type Gig } from '../services/orderService';
+import { gigService, type Gig } from '../services/gigService';
 import { paymentService } from '../services/paymentService';
 import { useAuthStore } from '../context/store/authStore';
 
@@ -38,7 +38,14 @@ export const CreateOrderForm: React.FC<CreateOrderFormProps> = ({
 
   useEffect(() => {
     if (gig && selectedPackageId) {
-      // Try to parse selectedPackageId as an index
+      // First try to find package by ID (UUID)
+      const packageByIdIndex = gig.packages.findIndex(pkg => pkg.id === selectedPackageId);
+      if (packageByIdIndex >= 0) {
+        setSelectedPackageIndex(packageByIdIndex);
+        return;
+      }
+      
+      // Fallback: try to parse selectedPackageId as an index
       const index = parseInt(selectedPackageId);
       if (!isNaN(index) && gig.packages[index]) {
         setSelectedPackageIndex(index);
@@ -57,7 +64,7 @@ export const CreateOrderForm: React.FC<CreateOrderFormProps> = ({
     setGigLoading(true);
     setError('');
     try {
-      const gigData = await orderService.getGigById(gigId);
+      const gigData = await gigService.getGigById(gigId);
       setGig(gigData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load gig details');
@@ -98,7 +105,7 @@ export const CreateOrderForm: React.FC<CreateOrderFormProps> = ({
       // Store order details in localStorage for use after payment success
       const orderDetails = {
         gigId,
-        packageId: selectedPackageIndex.toString(),
+        packageId: selectedPackage.id || `package_${selectedPackageIndex}`, // Use actual package ID if available, fallback to generated ID
         buyerId: user.userId,
         requirements: requirements.trim(),
         gigTitle: gig.title,

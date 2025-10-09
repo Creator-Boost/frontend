@@ -1,4 +1,5 @@
 export interface ServicePackage {
+  id?: string;
   name: string;
   price: number;
   deliveryDays: number;

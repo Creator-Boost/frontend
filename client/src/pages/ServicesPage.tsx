@@ -3,6 +3,7 @@ import { Search, SlidersHorizontal, AlertCircle, Loader } from 'lucide-react';
 import ServiceCard from '../components/ServiceCard';
 import { Service } from '../types/Service';
 import { gigService, type Gig } from '../services/gigService';
+import { userService, type UserProfile } from '../services/userService';
 import Footer from '../components/footer';
 
 const ServicesPage: React.FC = () => {
@@ -10,7 +11,9 @@ const ServicesPage: React.FC = () => {
   const [selectedPlatform, setSelectedPlatform] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [priceRange, setPriceRange] = useState('All');
+  const [sortBy, setSortBy] = useState('relevance');
   const [gigs, setGigs] = useState<Gig[]>([]);
+  const [userProfiles, setUserProfiles] = useState<Map<string, UserProfile>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,10 +23,24 @@ const ServicesPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // Fetch gigs
         const fetchedGigs = await gigService.getAllGigs();
         setGigs(fetchedGigs);
+        
+        // Extract unique seller IDs
+        const sellerIds = [...new Set(fetchedGigs.map(gig => gig.sellerId))];
+        
+        // Fetch user profiles for all sellers
+        const profiles = await userService.getUserProfiles(sellerIds);
+        const profileMap = new Map<string, UserProfile>();
+        profiles.forEach(profile => {
+          profileMap.set(profile.userId, profile);
+        });
+        setUserProfiles(profileMap);
+        
       } catch (err) {
-        console.error('Error fetching gigs:', err);
+        console.error('Error fetching data:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch services');
       } finally {
         setLoading(false);
@@ -36,6 +53,7 @@ const ServicesPage: React.FC = () => {
   // Convert Gig to Service format for compatibility with existing components
   const convertGigToService = (gig: Gig): Service => {
     const primaryImage = gig.images.find(img => img.isPrimary) || gig.images[0];
+    const sellerProfile = userProfiles.get(gig.sellerId);
     
     return {
       id: gig.id || Math.random().toString(), // Fallback if id is undefined
@@ -50,9 +68,9 @@ const ServicesPage: React.FC = () => {
       rating: 4.5, // Default rating - you might want to add this to your backend
       reviews: Math.floor(Math.random() * 200) + 10, // Random reviews - replace with real data
       expert: {
-        name: 'Expert', // You might want to fetch this from user service
-        avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-        level: 'Level 2'
+        name: sellerProfile?.name || 'Expert',
+        avatar: sellerProfile ? userService.getUserAvatarUrl(sellerProfile.imageUrl, sellerProfile.name) : 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+        level: 'Level 2' // You might want to add this to your user profile
       },
       thumbnail: primaryImage?.url || 'https://images.pexels.com/photos/4050318/pexels-photo-4050318.jpeg?auto=compress&cs=tinysrgb&w=400',
       images: gig.images.map(img => ({ url: img.url })),
@@ -76,8 +94,64 @@ const ServicesPage: React.FC = () => {
     const matchesSearch = service.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          service.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPlatform = selectedPlatform === 'All' || service.platform === selectedPlatform;
-    // Add more filtering logic here
-    return matchesSearch && matchesPlatform;
+    const matchesCategory = selectedCategory === 'All' || service.category === selectedCategory;
+    
+    // Price range filtering
+    let matchesPriceRange = true;
+    if (priceRange !== 'All' && service.packages.length > 0) {
+      const minPrice = Math.min(...service.packages.map(pkg => pkg.price));
+      
+      switch (priceRange) {
+        case 'Under $100':
+          matchesPriceRange = minPrice < 100;
+          break;
+        case '$100-$300':
+          matchesPriceRange = minPrice >= 100 && minPrice <= 300;
+          break;
+        case '$300-$500':
+          matchesPriceRange = minPrice > 300 && minPrice <= 500;
+          break;
+        case 'Over $500':
+          matchesPriceRange = minPrice > 500;
+          break;
+        default:
+          matchesPriceRange = true;
+      }
+    }
+    
+    return matchesSearch && matchesPlatform && matchesCategory && matchesPriceRange;
+  });
+
+  // Sort the filtered services
+  const sortedServices = [...filteredServices].sort((a, b) => {
+    switch (sortBy) {
+      case 'price_low_high':
+        const aMinPrice = a.packages.length > 0 ? Math.min(...a.packages.map(pkg => pkg.price)) : 0;
+        const bMinPrice = b.packages.length > 0 ? Math.min(...b.packages.map(pkg => pkg.price)) : 0;
+        return aMinPrice - bMinPrice;
+      
+      case 'price_high_low':
+        const aMaxPrice = a.packages.length > 0 ? Math.max(...a.packages.map(pkg => pkg.price)) : 0;
+        const bMaxPrice = b.packages.length > 0 ? Math.max(...b.packages.map(pkg => pkg.price)) : 0;
+        return bMaxPrice - aMaxPrice;
+      
+      case 'rating':
+        return b.rating - a.rating;
+      
+      case 'newest':
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      
+      case 'relevance':
+      default:
+        // For relevance, prioritize exact title matches, then description matches
+        const aExactMatch = a.title.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
+        const bExactMatch = b.title.toLowerCase().includes(searchTerm.toLowerCase()) ? 1 : 0;
+        if (aExactMatch !== bExactMatch) {
+          return bExactMatch - aExactMatch;
+        }
+        // Secondary sort by rating for relevance
+        return b.rating - a.rating;
+    }
   });
 
   return (
@@ -106,9 +180,22 @@ const ServicesPage: React.FC = () => {
           {/* Filters Sidebar */}
           <div className="lg:w-64 flex-shrink-0">
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center mb-4">
-                <SlidersHorizontal className="h-5 w-5 text-gray-500 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <SlidersHorizontal className="h-5 w-5 text-gray-500 mr-2" />
+                  <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedPlatform('All');
+                    setSelectedCategory('All');
+                    setPriceRange('All');
+                    setSearchTerm('');
+                  }}
+                  className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                >
+                  Clear All
+                </button>
               </div>
 
               {/* Platform Filter */}
@@ -203,26 +290,59 @@ const ServicesPage: React.FC = () => {
             {/* Services Content */}
             {!loading && !error && (
               <>
+                {/* Active Filters Summary */}
+                {(selectedPlatform !== 'All' || selectedCategory !== 'All' || priceRange !== 'All' || searchTerm) && (
+                  <div className="mb-4 p-4 bg-emerald-50 rounded-lg">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-emerald-800">Active filters:</span>
+                      {searchTerm && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                          Search: "{searchTerm}"
+                        </span>
+                      )}
+                      {selectedPlatform !== 'All' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                          Platform: {selectedPlatform}
+                        </span>
+                      )}
+                      {selectedCategory !== 'All' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                          Category: {selectedCategory}
+                        </span>
+                      )}
+                      {priceRange !== 'All' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                          Price: {priceRange}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center mb-6">
                   <p className="text-gray-600">
-                    {filteredServices.length} services found
+                    {sortedServices.length} services found
                   </p>
-                  <select className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500">
-                    <option>Sort by: Relevance</option>
-                    <option>Sort by: Price Low to High</option>
-                    <option>Sort by: Price High to Low</option>
-                    <option>Sort by: Rating</option>
-                    <option>Sort by: Newest</option>
+                  <select 
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value="relevance">Sort by: Relevance</option>
+                    <option value="price_low_high">Sort by: Price Low to High</option>
+                    <option value="price_high_low">Sort by: Price High to Low</option>
+                    <option value="rating">Sort by: Rating</option>
+                    <option value="newest">Sort by: Newest</option>
                   </select>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {filteredServices.map((service) => (
+                  {sortedServices.map((service) => (
                     <ServiceCard key={service.id} service={service} />
                   ))}
                 </div>
 
-                {filteredServices.length === 0 && (
+                {sortedServices.length === 0 && (
                   <div className="text-center py-12">
                     <p className="text-gray-500 text-lg">No services found matching your criteria.</p>
                     <p className="text-gray-400 mt-2">Try adjusting your filters or search terms.</p>

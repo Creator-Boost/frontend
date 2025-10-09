@@ -2,7 +2,6 @@ import axios from 'axios';
 import { useAuthStore } from '../context/store/authStore';
 
 const ORDER_API_URL = 'http://localhost:8085/api/orders';
-const GIG_API_URL = 'http://localhost:8084/api/gigs';
 
 // Set up axios to include credentials
 axios.defaults.withCredentials = true;
@@ -25,14 +24,9 @@ export const ORDER_STATUS_PERCENTAGE = {
 
 export interface CreateOrderRequest {
   gigId: string;
-  packageId: string; // Revert back to packageId
+  packageId: string;
   buyerId: string;
   requirements: string;
-  gigPackageId?: string;
-  sellerId?: string;
-  amount?: number;
-  packageName?: string;
-  deliveryDate?: string;
 }
 
 export interface UpdateStatusRequest {
@@ -49,62 +43,45 @@ export interface Order {
   gigPackageId: string;
   buyerId: string;
   sellerId: string;
+  buyerName: string;
+  sellerName: string;
   amount: number;
   packageName: string;
   requirements: string;
-  status: keyof typeof ORDER_STATUS;
+  status: string; // Backend uses "NEW" instead of our enum
   orderDate: string;
   deliveryDate: string;
-  gigTitle: string;
-  gigDescription: string;
-  packageDescription: string;
-  deliveryFiles?: string[];
-}
-
-export interface GigPackage {
-  id: string;
-  name: string;
-  price: number;
-  deliveryDays: number;
-  description: string;
-}
-
-export interface Gig {
-  id: string;
-  title: string;
-  description: string;
-  sellerId: string;
-  platform: string;
-  category: string;
-  status: string;
-  packages: GigPackage[];
-  images: Array<{
-    url: string;
-    isPrimary: boolean;
-  }>;
-  faqs: Array<{
-    question: string;
-    answer: string;
-  }>;
-  createdAt?: string;
-  updatedAt?: string;
+  gigTitle: string | null;
+  gigDescription: string | null;
+  packageDescription: string | null;
+  deliveryFiles?: string[]; // Legacy field for backward compatibility
+  deliveredFiles?: string; // Backend field - comma-separated URLs
+  payments: any[];
+  review: any;
 }
 
 class OrderService {
   /**
-   * Get gig details by ID from gig service
+   * Parse deliveredFiles string into array of file URLs
    */
-  async getGigById(gigId: string): Promise<Gig> {
+  parseDeliveredFiles(deliveredFiles?: string): string[] {
+    if (!deliveredFiles || deliveredFiles.trim() === '') {
+      return [];
+    }
+    return deliveredFiles.split(',').map(url => url.trim()).filter(url => url.length > 0);
+  }
+
+  /**
+   * Get filename from URL
+   */
+  getFilenameFromUrl(url: string): string {
     try {
-      const response = await axios.get<Gig>(`${GIG_API_URL}/${gigId}`);
-      return response.data;
+      const urlParts = url.split('/');
+      const filename = urlParts[urlParts.length - 1];
+      // Remove any query parameters
+      return filename.split('?')[0] || 'downloaded-file';
     } catch (error) {
-      console.error('Error fetching gig details:', error);
-      if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch gig details';
-        throw new Error(errorMessage);
-      }
-      throw new Error('Failed to fetch gig details');
+      return 'downloaded-file';
     }
   }
 
@@ -303,10 +280,21 @@ class OrderService {
   }
 
   /**
-   * Get status percentage for progress display
+   * Get status percentage for progress display - handles both backend and frontend status formats
    */
-  getStatusPercentage(status: keyof typeof ORDER_STATUS): number {
-    return ORDER_STATUS_PERCENTAGE[ORDER_STATUS[status] as keyof typeof ORDER_STATUS_PERCENTAGE];
+  getStatusPercentage(status: string): number {
+    // Map backend status to frontend status
+    const statusMap: { [key: string]: keyof typeof ORDER_STATUS_PERCENTAGE } = {
+      'NEW': 'Not Started',
+      'NOT_STARTED': 'Not Started',
+      'IN_PROGRESS': 'In Progress',
+      'UNDER_TESTING': 'Under Testing',
+      'PENDING_REVIEW': 'Pending Review',
+      'DELIVERED': 'Delivered'
+    };
+    
+    const mappedStatus = statusMap[status] || 'Not Started';
+    return ORDER_STATUS_PERCENTAGE[mappedStatus];
   }
 
   /**
@@ -345,14 +333,24 @@ class OrderService {
   }
 
   /**
-   * Get formatted status display
+   * Get formatted status display - handles both backend and frontend status formats
    */
-  getStatusDisplay(status: keyof typeof ORDER_STATUS): {
+  getStatusDisplay(status: string): {
     label: string;
     percentage: number;
     color: string;
   } {
-    const label = ORDER_STATUS[status];
+    // Map backend status to display label
+    const statusLabels: { [key: string]: string } = {
+      'NEW': 'Not Started',
+      'NOT_STARTED': 'Not Started',
+      'IN_PROGRESS': 'In Progress',
+      'UNDER_TESTING': 'Under Testing',
+      'PENDING_REVIEW': 'Pending Review',
+      'DELIVERED': 'Delivered'
+    };
+    
+    const label = statusLabels[status] || status.replace('_', ' ');
     const percentage = this.getStatusPercentage(status);
     
     let color = 'bg-gray-100 text-gray-800';

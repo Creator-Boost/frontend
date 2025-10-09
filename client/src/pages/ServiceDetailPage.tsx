@@ -6,6 +6,7 @@ import { usePaymentStore } from '../context/store/paymentStore';
 import { useAuthStore } from '../context/store/authStore';
 import CreateOrderForm from '../components/CreateOrderForm';
 import { gigService, type Gig } from '../services/gigService';
+import { userService, type UserProfile } from '../services/userService';
 import toast from 'react-hot-toast';
 
 const ServiceDetailPage: React.FC = () => {
@@ -23,7 +24,7 @@ const ServiceDetailPage: React.FC = () => {
   const { hasUserPurchasedService, fetchUserPurchases } = usePaymentStore();
 
   // Convert Gig to Service format for compatibility with existing UI components
-  const convertGigToService = (gig: Gig): Service => {
+  const convertGigToService = (gig: Gig, seller: UserProfile | null): Service => {
     const primaryImage = gig.images.find(img => img.isPrimary) || gig.images[0];
     
     return {
@@ -39,9 +40,9 @@ const ServiceDetailPage: React.FC = () => {
       rating: 4.5, // Default rating - you might want to add this to your backend
       reviews: Math.floor(Math.random() * 200) + 10, // Random reviews - replace with real data
       expert: {
-        name: 'Expert', // You might want to fetch this from user service
-        avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-        level: 'Level 2'
+        name: seller?.name || 'Expert',
+        avatar: seller ? userService.getUserAvatarUrl(seller.imageUrl, seller.name) : 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
+        level: 'Level 2' // You might want to add this to your user profile
       },
       thumbnail: primaryImage?.url || 'https://images.pexels.com/photos/4050318/pexels-photo-4050318.jpeg?auto=compress&cs=tinysrgb&w=400',
       images: gig.images.map(img => ({ url: img.url })),
@@ -67,9 +68,17 @@ const ServiceDetailPage: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
+        
+        // Fetch the gig
         const fetchedGig = await gigService.getGigById(id);
-        const convertedService = convertGigToService(fetchedGig);
+        
+        // Fetch the seller profile
+        const seller = await userService.getUserProfile(fetchedGig.sellerId);
+        
+        // Convert gig to service with seller info
+        const convertedService = convertGigToService(fetchedGig, seller);
         setService(convertedService);
+        
       } catch (err) {
         console.error('Error fetching gig:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch service details');
@@ -413,7 +422,7 @@ const ServiceDetailPage: React.FC = () => {
           isOpen={showOrderForm}
           onClose={() => setShowOrderForm(false)}
           gigId={service.id}
-          selectedPackageId={`${service.id}-${selectedPackage}`} // Generate package ID
+          selectedPackageId={service.packages[selectedPackage]?.id || selectedPackage.toString()} // Use actual package ID if available
           onOrderCreated={handleOrderCreated}
         />
       )}

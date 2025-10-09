@@ -11,6 +11,7 @@ export interface GigImage {
 }
 
 export interface GigPackage {
+  id?: string;
   name: string;
   price: number;
   deliveryDays: number;
@@ -29,7 +30,7 @@ export interface Gig {
   description: string;
   platform: string;
   category: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'ACTIVE' | 'INACTIVE' | 'Active' | 'Paused';
   images: GigImage[];
   packages: GigPackage[];
   faqs: GigFAQ[];
@@ -43,7 +44,7 @@ export interface CreateGigRequest {
   description: string;
   platform: string;
   category: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'ACTIVE' | 'INACTIVE' | 'Active' | 'Paused';
   images: GigImage[];
   packages: GigPackage[];
   faqs: GigFAQ[];
@@ -138,7 +139,17 @@ class GigService {
   async getGigById(gigId: string): Promise<Gig> {
     try {
       const response = await axios.get(`${API_BASE_URL}/${gigId}`);
-      return response.data;
+      
+      // Handle both array and single object responses
+      const data = response.data;
+      if (Array.isArray(data)) {
+        if (data.length === 0) {
+          throw new Error('Gig not found');
+        }
+        return data[0]; // Return the first (and should be only) gig from array
+      }
+      
+      return data; // Return single gig object
     } catch (error) {
       console.error('Error fetching gig:', error);
       if (axios.isAxiosError(error)) {
@@ -172,6 +183,28 @@ class GigService {
   }
 
   /**
+   * Update gig by seller ID (using the seller-specific endpoint)
+   */
+  async updateGigBySeller(sellerId: string, gigData: Partial<CreateGigRequest>): Promise<Gig> {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/seller/${sellerId}`, gigData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error updating gig by seller:', error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update gig';
+        throw new Error(errorMessage);
+      }
+      throw new Error('Failed to update gig');
+    }
+  }
+
+  /**
    * Delete a gig
    */
   async deleteGig(gigId: string): Promise<void> {
@@ -188,9 +221,9 @@ class GigService {
   }
 
   /**
-   * Update gig status (ACTIVE/INACTIVE)
+   * Update gig status (ACTIVE/INACTIVE/Active/Paused)
    */
-  async updateGigStatus(gigId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<Gig> {
+  async updateGigStatus(gigId: string, status: 'ACTIVE' | 'INACTIVE' | 'Active' | 'Paused'): Promise<Gig> {
     try {
       const response = await axios.patch(`${API_BASE_URL}/${gigId}/status`, { status }, {
         headers: {

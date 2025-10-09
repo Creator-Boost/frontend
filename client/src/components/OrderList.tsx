@@ -7,14 +7,13 @@ import {
   Eye, 
   CheckCircle, 
   AlertCircle,
-  Upload,
-  Download,
   MessageCircle,
   X,
   FileText
 } from 'lucide-react';
 import { orderService, type Order, ORDER_STATUS } from '../services/orderService';
 import { useAuthStore } from '../context/store/authStore';
+import FileUploadManager from './FileUploadManager';
 
 interface OrderListProps {
   viewType?: 'buyer' | 'seller' | 'all';
@@ -29,7 +28,7 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const [uploadingFiles, setUploadingFiles] = useState<string | null>(null);
+  const [orderFiles, setOrderFiles] = useState<{url: string, filename: string}[]>([]);
 
   useEffect(() => {
     fetchOrders();
@@ -72,38 +71,60 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
     }
   };
 
-  const handleFileUpload = async (orderId: string, files: FileList) => {
-    setUploadingFiles(orderId);
-    try {
-      await orderService.addDeliveryFiles(orderId, files);
-      await fetchOrders();
-      alert('Delivery files uploaded successfully!');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to upload files');
-    } finally {
-      setUploadingFiles(null);
-    }
-  };
-
   const canUpdateStatus = (order: Order): boolean => {
     return user?.userId === order.sellerId;
   };
 
-  const canUploadFiles = (order: Order): boolean => {
-    return user?.userId === order.sellerId;
+  const parseOrderFiles = (order: Order): {url: string, filename: string}[] => {
+    const files: {url: string, filename: string}[] = [];
+    
+    if (order.deliveredFiles) {
+      const fileUrls = orderService.parseDeliveredFiles(order.deliveredFiles);
+      fileUrls.forEach(url => {
+        files.push({
+          url: url,
+          filename: orderService.getFilenameFromUrl(url)
+        });
+      });
+    }
+    
+    return files;
+  };
+
+  const loadOrderFiles = async (order: Order) => {
+    try {
+      // Fetch fresh order data to get latest deliveredFiles
+      const freshOrder = await orderService.getOrderById(order.id);
+      const files = parseOrderFiles(freshOrder);
+      setOrderFiles(files);
+      
+      // Also update the selected order to have latest data
+      setSelectedOrder(freshOrder);
+    } catch (error) {
+      console.error('Error loading order files:', error);
+      // Fallback to current order data
+      const files = parseOrderFiles(order);
+      setOrderFiles(files);
+    }
+  };
+
+  const handleFilesRefresh = async () => {
+    if (selectedOrder) {
+      await loadOrderFiles(selectedOrder);
+    }
   };
 
   const OrderDetailsModal = () => {
     if (!selectedOrder || !showOrderDetails) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
         <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-between items-center p-6 border-b">
+          <div className="flex items-center justify-between p-6 border-b">
             <h2 className="text-2xl font-bold text-gray-900">Order Details</h2>
             <button
               onClick={() => setShowOrderDetails(false)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 transition-colors hover:text-gray-600"
             >
               <X size={24} />
             </button>
@@ -111,11 +132,13 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
 
           <div className="p-6 space-y-6">
             {/* Order Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Order Information</h3>
+                <h3 className="mb-2 font-semibold text-gray-900">Order Information</h3>
                 <div className="space-y-2 text-sm">
                   <div><span className="font-medium">Order ID:</span> {selectedOrder.id}</div>
+                  <div><span className="font-medium">Buyer:</span> {selectedOrder.buyerName}</div>
+                  <div><span className="font-medium">Seller:</span> {selectedOrder.sellerName}</div>
                   <div><span className="font-medium">Package:</span> {selectedOrder.packageName}</div>
                   <div><span className="font-medium">Amount:</span> ${selectedOrder.amount}</div>
                   <div><span className="font-medium">Order Date:</span> {orderService.formatDate(selectedOrder.orderDate)}</div>
@@ -123,15 +146,15 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
                 </div>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Progress</h3>
+                <h3 className="mb-2 font-semibold text-gray-900">Progress</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>{ORDER_STATUS[selectedOrder.status]}</span>
+                    <span>{orderService.getStatusDisplay(selectedOrder.status).label}</span>
                     <span>{orderService.getStatusPercentage(selectedOrder.status)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div className="w-full h-3 bg-gray-200 rounded-full">
                     <div 
-                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
+                      className="h-3 transition-all duration-300 bg-blue-600 rounded-full"
                       style={{ width: `${orderService.getStatusPercentage(selectedOrder.status)}%` }}
                     ></div>
                   </div>
@@ -141,57 +164,38 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
 
             {/* Requirements */}
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Requirements</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="mb-2 font-semibold text-gray-900">Requirements</h3>
+              <div className="p-4 rounded-lg bg-gray-50">
                 <p className="text-sm text-gray-700">{selectedOrder.requirements}</p>
               </div>
             </div>
 
-            {/* Delivery Files */}
-            {selectedOrder.deliveryFiles && selectedOrder.deliveryFiles.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Delivery Files</h3>
-                <div className="space-y-2">
-                  {selectedOrder.deliveryFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded">
-                      <span className="text-sm text-gray-700">{file}</span>
-                      <button className="text-blue-600 hover:text-blue-800">
-                        <Download size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* File Upload Manager */}
+            <div>
+              <h3 className="mb-4 font-semibold text-gray-900">Order Files</h3>
+              <FileUploadManager
+                orderId={selectedOrder.id}
+                files={orderFiles}
+                userRole={user?.userId === selectedOrder.buyerId ? 'client' : 'expert'}
+                onFilesUpdate={handleFilesRefresh}
+                className="p-4 rounded-lg bg-gray-50"
+              />
+            </div>
 
             {/* Actions */}
-            <div className="border-t pt-4">
+            <div className="pt-4 border-t">
               <div className="flex gap-3">
                 {canUpdateStatus(selectedOrder) && (
                   <select
                     value={selectedOrder.status}
                     onChange={(e) => handleStatusUpdate(selectedOrder.id, e.target.value as keyof typeof ORDER_STATUS)}
                     disabled={updatingStatus === selectedOrder.id}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    className="px-3 py-2 text-sm border border-gray-300 rounded-md"
                   >
                     {Object.entries(ORDER_STATUS).map(([key, value]) => (
                       <option key={key} value={key}>{value}</option>
                     ))}
                   </select>
-                )}
-                
-                {canUploadFiles(selectedOrder) && (
-                  <label className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 cursor-pointer text-sm flex items-center gap-2">
-                    <Upload size={16} />
-                    Upload Files
-                    <input
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => e.target.files && handleFileUpload(selectedOrder.id, e.target.files)}
-                      disabled={uploadingFiles === selectedOrder.id}
-                    />
-                  </label>
                 )}
               </div>
             </div>
@@ -203,8 +207,8 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center py-8">
+        <div className="w-8 h-8 border-b-2 border-blue-600 rounded-full animate-spin"></div>
         <span className="ml-3 text-gray-600">Loading orders...</span>
       </div>
     );
@@ -212,7 +216,7 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+      <div className="flex items-center gap-2 px-4 py-3 text-red-700 border border-red-200 rounded-lg bg-red-50">
         <AlertCircle size={20} />
         <div>
           <div className="font-medium">Error loading orders</div>
@@ -220,7 +224,7 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
         </div>
         <button
           onClick={fetchOrders}
-          className="ml-auto bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+          className="px-3 py-1 ml-auto text-sm text-white bg-red-600 rounded hover:bg-red-700"
         >
           Retry
         </button>
@@ -230,9 +234,9 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
 
   if (orders.length === 0) {
     return (
-      <div className="text-center py-12">
-        <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+      <div className="py-12 text-center">
+        <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+        <h3 className="mb-2 text-lg font-medium text-gray-900">No orders found</h3>
         <p className="text-gray-500">
           {viewType === 'buyer' 
             ? "You haven't placed any orders yet." 
@@ -247,13 +251,13 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-900">
           {viewType === 'buyer' ? 'My Orders' : viewType === 'seller' ? 'Orders to Fulfill' : 'All Orders'}
         </h2>
         <button
           onClick={fetchOrders}
-          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm"
+          className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
         >
           Refresh
         </button>
@@ -265,15 +269,15 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
         const isSeller = user?.userId === order.sellerId;
 
         return (
-          <div key={order.id} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
+          <div key={order.id} className="p-6 transition-shadow bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md">
+            <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                  {order.gigTitle}
+                <h3 className="mb-1 text-lg font-semibold text-gray-900">
+                  {order.gigTitle || order.requirements.substring(0, 60) + (order.requirements.length > 60 ? '...' : '')}
                 </h3>
-                <p className="text-gray-600 text-sm mb-2 line-clamp-2">{order.gigDescription}</p>
+                <p className="mb-2 text-sm text-gray-600 line-clamp-2">{order.gigDescription || `Package: ${order.packageName}`}</p>
                 
-                <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
+                <div className="flex items-center gap-4 mb-2 text-sm text-gray-500">
                   <div className="flex items-center gap-1">
                     <Package size={16} />
                     <span>{order.packageName}</span>
@@ -284,19 +288,19 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
                   </div>
                   <div className="flex items-center gap-1">
                     <User size={16} />
-                    <span>{isBuyer ? 'Your Order' : isSeller ? 'Your Service' : 'Order'}</span>
+                    <span>{isBuyer ? `Seller: ${order.sellerName}` : isSeller ? `Client: ${order.buyerName}` : 'Order'}</span>
                   </div>
                 </div>
 
                 {/* Role Badge */}
                 <div className="flex items-center gap-2 mb-3">
                   {isBuyer && (
-                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                    <span className="px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded">
                       Buyer
                     </span>
                   )}
                   {isSeller && (
-                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                    <span className="px-2 py-1 text-xs font-medium text-green-800 bg-green-100 rounded">
                       Seller
                     </span>
                   )}
@@ -304,7 +308,7 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
               </div>
               
               <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900 mb-2">
+                <div className="mb-2 text-2xl font-bold text-gray-900">
                   ${order.amount}
                 </div>
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusDisplay.color}`}>
@@ -315,20 +319,20 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
 
             {/* Progress Bar */}
             <div className="mb-4">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
+              <div className="flex justify-between mb-1 text-sm text-gray-600">
                 <span>Progress</span>
                 <span>{statusDisplay.percentage}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full h-2 bg-gray-200 rounded-full">
                 <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  className="h-2 transition-all duration-300 bg-blue-600 rounded-full"
                   style={{ width: `${statusDisplay.percentage}%` }}
                 ></div>
               </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
               <div className="flex items-center gap-1 text-sm text-gray-500">
                 <Clock size={16} />
                 <span>Ordered: {orderService.formatDate(order.orderDate)}</span>
@@ -336,11 +340,12 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
               
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setSelectedOrder(order);
                     setShowOrderDetails(true);
+                    await loadOrderFiles(order);
                   }}
-                  className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
                 >
                   <Eye size={16} />
                   View Details
@@ -350,10 +355,10 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
                   <button
                     onClick={() => handleStatusUpdate(order.id, 'IN_PROGRESS')}
                     disabled={updatingStatus === order.id || order.status !== 'NOT_STARTED'}
-                    className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1 disabled:opacity-50"
+                    className="flex items-center gap-1 text-sm text-green-600 hover:text-green-800 disabled:opacity-50"
                   >
                     {updatingStatus === order.id ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                      <div className="w-4 h-4 border-b-2 border-green-600 rounded-full animate-spin"></div>
                     ) : (
                       <CheckCircle size={16} />
                     )}
@@ -361,7 +366,7 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
                   </button>
                 )}
 
-                <button className="text-gray-600 hover:text-gray-800 text-sm flex items-center gap-1">
+                <button className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800">
                   <MessageCircle size={16} />
                   Message
                 </button>
@@ -369,8 +374,8 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
             </div>
 
             {/* Requirements Preview */}
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-1">
+            <div className="pt-4 mt-4 border-t border-gray-100">
+              <h4 className="flex items-center gap-1 mb-2 text-sm font-medium text-gray-900">
                 <FileText size={16} />
                 Requirements:
               </h4>
