@@ -6,6 +6,7 @@ import ViewGigModal from '../../components/ViewGigModal';
 import EarningsChart, { type EarningsDataPoint } from '../../components/EarningsChart';
 import UserAvatar from '../../components/UserAvatar';
 import OrderList from '../../components/OrderList';
+import ExpertReviews from '../../components/ExpertReviews';
 import { useAuthStore } from '../../context/store/authStore';
 import { orderService, type Order } from '../../services/orderService';
 import { gigService, type Gig } from '../../services/gigService';
@@ -220,7 +221,7 @@ const ExpertDashboard: React.FC = () => {
         <div className="mb-6 bg-white rounded-lg shadow-sm">
           <div className="border-b border-gray-200">
             <nav className="flex px-6 space-x-8">
-              {['overview', 'gigs', 'orders', 'earnings', 'messages'].map((tab) => (
+              {['overview', 'gigs', 'orders', 'reviews', 'earnings', 'messages'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -292,6 +293,34 @@ const ExpertDashboard: React.FC = () => {
                       No recent orders found
                     </div>
                   )}
+                </div>
+
+                {/* Recent Reviews Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">Recent Reviews</h3>
+                    <button 
+                      onClick={() => setActiveTab('reviews')}
+                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                    >
+                      View All Reviews →
+                    </button>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 mb-2">
+                      Check your latest customer reviews and ratings
+                    </p>
+                    <div className="flex items-center space-x-4 text-sm">
+                      <div className="flex items-center">
+                        <Star className="h-4 w-4 text-yellow-400 fill-current mr-1" />
+                        <span className="text-gray-700">Average Rating</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="h-4 w-4 bg-emerald-500 rounded-full mr-1"></span>
+                        <span className="text-gray-700">Customer Satisfaction</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -400,6 +429,12 @@ const ExpertDashboard: React.FC = () => {
             {activeTab === 'orders' && (
               <div>
                 <OrderList viewType="seller" userId={user?.userId} />
+              </div>
+            )}
+
+            {activeTab === 'reviews' && (
+              <div>
+                <ExpertReviews userId={user?.userId} />
               </div>
             )}
 

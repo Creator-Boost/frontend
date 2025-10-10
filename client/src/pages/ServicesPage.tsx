@@ -4,6 +4,7 @@ import ServiceCard from '../components/ServiceCard';
 import { Service } from '../types/Service';
 import { gigService, type Gig } from '../services/gigService';
 import { userService, type UserProfile } from '../services/userService';
+import { reviewService, type ReviewStats } from '../services/reviewService';
 import Footer from '../components/footer';
 
 const ServicesPage: React.FC = () => {
@@ -14,6 +15,7 @@ const ServicesPage: React.FC = () => {
   const [sortBy, setSortBy] = useState('relevance');
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [userProfiles, setUserProfiles] = useState<Map<string, UserProfile>>(new Map());
+  const [reviewStats, setReviewStats] = useState<Map<string, ReviewStats>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,24 @@ const ServicesPage: React.FC = () => {
         });
         setUserProfiles(profileMap);
         
+        // Fetch review statistics for all gigs
+        const statsMap = new Map<string, ReviewStats>();
+        await Promise.all(
+          fetchedGigs.map(async (gig) => {
+            if (gig.id) {
+              try {
+                const stats = await reviewService.getReviewStatsForGig(gig.id);
+                statsMap.set(gig.id, stats);
+              } catch (err) {
+                console.error(`Error fetching stats for gig ${gig.id}:`, err);
+                // Set default stats if error
+                statsMap.set(gig.id, { averageRating: 0, totalReviews: 0 });
+              }
+            }
+          })
+        );
+        setReviewStats(statsMap);
+        
       } catch (err) {
         console.error('Error fetching data:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch services');
@@ -54,6 +74,11 @@ const ServicesPage: React.FC = () => {
   const convertGigToService = (gig: Gig): Service => {
     const primaryImage = gig.images.find(img => img.isPrimary) || gig.images[0];
     const sellerProfile = userProfiles.get(gig.sellerId);
+    const gigReviewStats = gig.id ? reviewStats.get(gig.id) : null;
+    
+    // Use backend rating data if available, otherwise use calculated stats, or default values
+    const rating = gig.averageRating || gigReviewStats?.averageRating || 0;
+    const totalReviews = gig.totalReviews || gigReviewStats?.totalReviews || 0;
     
     return {
       id: gig.id || Math.random().toString(), // Fallback if id is undefined
@@ -65,8 +90,8 @@ const ServicesPage: React.FC = () => {
       status: gig.status as 'ACTIVE' | 'PAUSED' | 'DRAFT',
       createdAt: gig.createdAt || new Date().toISOString(),
       updatedAt: gig.updatedAt || new Date().toISOString(),
-      rating: 4.5, // Default rating - you might want to add this to your backend
-      reviews: Math.floor(Math.random() * 200) + 10, // Random reviews - replace with real data
+      rating: rating,
+      reviews: totalReviews,
       expert: {
         name: sellerProfile?.name || 'Expert',
         avatar: sellerProfile ? userService.getUserAvatarUrl(sellerProfile.imageUrl, sellerProfile.name) : 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',

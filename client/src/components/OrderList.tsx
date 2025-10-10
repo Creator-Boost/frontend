@@ -9,11 +9,13 @@ import {
   AlertCircle,
   MessageCircle,
   X,
-  FileText
+  FileText,
+  Flag
 } from 'lucide-react';
 import { orderService, type Order, ORDER_STATUS } from '../services/orderService';
 import { useAuthStore } from '../context/store/authStore';
 import FileUploadManager from './FileUploadManager';
+import DisputeModal from './DisputeModal';
 
 interface OrderListProps {
   viewType?: 'buyer' | 'seller' | 'all';
@@ -29,6 +31,8 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [orderFiles, setOrderFiles] = useState<{url: string, filename: string}[]>([]);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeOrder, setDisputeOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -111,6 +115,25 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
   const handleFilesRefresh = async () => {
     if (selectedOrder) {
       await loadOrderFiles(selectedOrder);
+    }
+  };
+
+  const handleCreateDispute = (order: Order) => {
+    setDisputeOrder(order);
+    setShowDisputeModal(true);
+  };
+
+  const handleDisputeSubmit = async (disputeData: { title: string; description: string }) => {
+    if (!disputeOrder) return;
+    
+    try {
+      await orderService.addDispute(disputeOrder.id, disputeData);
+      alert('Dispute submitted successfully! Our support team will review it shortly.');
+      // Refresh orders to show updated data
+      await fetchOrders();
+    } catch (error) {
+      console.error('Error creating dispute:', error);
+      throw error; // Re-throw to let modal handle the error
     }
   };
 
@@ -366,6 +389,18 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
                   </button>
                 )}
 
+                {/* Dispute Button - Available for both buyer and seller */}
+                {(isBuyer || isSeller) && (
+                  <button
+                    onClick={() => handleCreateDispute(order)}
+                    className="flex items-center gap-1 text-sm text-red-600 hover:text-red-800"
+                    title="Create Dispute"
+                  >
+                    <Flag size={16} />
+                    Dispute
+                  </button>
+                )}
+
                 <button className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800">
                   <MessageCircle size={16} />
                   Message
@@ -386,6 +421,17 @@ export const OrderList: React.FC<OrderListProps> = ({ viewType = 'all', userId }
       })}
 
       <OrderDetailsModal />
+      
+      {/* Dispute Modal */}
+      <DisputeModal
+        isOpen={showDisputeModal}
+        onClose={() => {
+          setShowDisputeModal(false);
+          setDisputeOrder(null);
+        }}
+        onSubmit={handleDisputeSubmit}
+        orderTitle={disputeOrder?.gigTitle || disputeOrder?.packageName || 'Order'}
+      />
     </div>
   );
 };

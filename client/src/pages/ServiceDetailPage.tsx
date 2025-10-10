@@ -5,8 +5,11 @@ import { Service } from '../types/Service';
 import { usePaymentStore } from '../context/store/paymentStore';
 import { useAuthStore } from '../context/store/authStore';
 import CreateOrderForm from '../components/CreateOrderForm';
+import ReviewList from '../components/ReviewList';
+import ReviewSummary from '../components/ReviewSummary';
 import { gigService, type Gig } from '../services/gigService';
 import { userService, type UserProfile } from '../services/userService';
+import { reviewService, type Review, type ReviewStats } from '../services/reviewService';
 import toast from 'react-hot-toast';
 
 const ServiceDetailPage: React.FC = () => {
@@ -19,13 +22,19 @@ const ServiceDetailPage: React.FC = () => {
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   
   const { isAuthenticated } = useAuthStore();
   const { hasUserPurchasedService, fetchUserPurchases } = usePaymentStore();
 
   // Convert Gig to Service format for compatibility with existing UI components
-  const convertGigToService = (gig: Gig, seller: UserProfile | null): Service => {
+  const convertGigToService = (gig: Gig, seller: UserProfile | null, reviewStats: ReviewStats): Service => {
     const primaryImage = gig.images.find(img => img.isPrimary) || gig.images[0];
+    
+    // Use backend rating data if available, otherwise use calculated stats
+    const rating = gig.averageRating || reviewStats.averageRating || 0;
+    const totalReviews = gig.totalReviews || reviewStats.totalReviews || 0;
     
     return {
       id: gig.id || Math.random().toString(),
@@ -37,8 +46,8 @@ const ServiceDetailPage: React.FC = () => {
       status: gig.status as 'ACTIVE' | 'PAUSED' | 'DRAFT',
       createdAt: gig.createdAt || new Date().toISOString(),
       updatedAt: gig.updatedAt || new Date().toISOString(),
-      rating: 4.5, // Default rating - you might want to add this to your backend
-      reviews: Math.floor(Math.random() * 200) + 10, // Random reviews - replace with real data
+      rating: rating,
+      reviews: totalReviews,
       expert: {
         name: seller?.name || 'Expert',
         avatar: seller ? userService.getUserAvatarUrl(seller.imageUrl, seller.name) : 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
@@ -75,8 +84,11 @@ const ServiceDetailPage: React.FC = () => {
         // Fetch the seller profile
         const seller = await userService.getUserProfile(fetchedGig.sellerId);
         
-        // Convert gig to service with seller info
-        const convertedService = convertGigToService(fetchedGig, seller);
+        // Fetch review statistics
+        const stats = await reviewService.getReviewStatsForGig(id);
+        
+        // Convert gig to service with seller info and review stats
+        const convertedService = convertGigToService(fetchedGig, seller, stats);
         setService(convertedService);
         
       } catch (err) {
@@ -88,6 +100,26 @@ const ServiceDetailPage: React.FC = () => {
     };
 
     fetchGig();
+  }, [id]);
+
+  // Fetch reviews separately
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!id) return;
+
+      try {
+        setReviewsLoading(true);
+        const fetchedReviews = await reviewService.getReviewsForGig(id);
+        setReviews(fetchedReviews);
+      } catch (err) {
+        console.error('Error fetching reviews:', err);
+        // Don't set error state for reviews, just log it
+      } finally {
+        setReviewsLoading(false);
+      }
+    };
+
+    fetchReviews();
   }, [id]);
 
   // Check if user has purchased this service
@@ -114,36 +146,6 @@ const ServiceDetailPage: React.FC = () => {
     // Optionally navigate to order details or dashboard
     navigate('/dashboard/client');
   };
-
-  const reviews = [
-    {
-      id: '1',
-      client: 'John Smith',
-      avatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=400',
-      rating: 5,
-      date: '2 weeks ago',
-      package: 'Premium',
-      review: 'Sarah provided incredible insights that helped my channel grow exponentially. Her strategy was detailed and easy to implement. Highly recommended!'
-    },
-    {
-      id: '2',
-      client: 'Emma Wilson',
-      avatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=400',
-      rating: 5,
-      date: '1 month ago',
-      package: 'Standard',
-      review: 'Amazing work! Sarah helped me understand my audience better and create content that actually engages. My follower count has doubled since implementing her suggestions.'
-    },
-    {
-      id: '3',
-      client: 'Mike Chen',
-      avatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=400',
-      rating: 5,
-      date: '1 month ago',
-      package: 'Basic',
-      review: 'Professional, thorough, and results-driven. Sarah identified areas I never would have thought of and provided actionable solutions.'
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -283,38 +285,29 @@ const ServiceDetailPage: React.FC = () => {
 
             {/* Reviews */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Reviews ({service.reviews})
+              <h3 className="text-lg font-semibold text-gray-900 mb-6">
+                Customer Reviews
               </h3>
-              <div className="space-y-6">
-                {reviews.map((review) => (
-                  <div key={review.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                    <div className="flex items-start">
-                      <img
-                        src={review.avatar}
-                        alt={review.client}
-                        className="w-10 h-10 rounded-full mr-4"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{review.client}</h4>
-                            <p className="text-sm text-gray-600">{review.package} Package</p>
-                          </div>
-                          <div className="text-right">
-                            <div className="flex items-center">
-                              {Array.from({ length: review.rating }).map((_, i) => (
-                                <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
-                              ))}
-                            </div>
-                            <p className="text-sm text-gray-500">{review.date}</p>
-                          </div>
-                        </div>
-                        <p className="text-gray-700">{review.review}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              
+              {/* Review Summary */}
+              {service.reviews > 0 && (
+                <ReviewSummary
+                  averageRating={service.rating}
+                  totalReviews={service.reviews}
+                />
+              )}
+              
+              {/* Individual Reviews */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-4">
+                  All Reviews ({service.reviews})
+                </h4>
+                <ReviewList
+                  reviews={reviews}
+                  loading={reviewsLoading}
+                  emptyMessage="No reviews yet"
+                  emptySubMessage="Be the first to review this service!"
+                />
               </div>
             </div>
           </div>

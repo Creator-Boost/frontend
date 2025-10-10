@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import axios, { AxiosError } from "axios";
 
-const API_URL = "http://localhost:8080/api/auth"; // adjust for API Gateway if needed
+// const API_URL = "http://localhost:8080/api/auth"; // adjust for API Gateway if needed
+const API_URL = "http://localhost:8081";
 axios.defaults.withCredentials = true; // send/receive JWT cookies automatically
 
 
@@ -24,8 +25,54 @@ interface ProfileResponse {
 	userId: string;
 	imageUrl?: string;
     createdAt: string;
-	
+}
 
+interface Gig {
+	id: string;
+	title: string;
+	description: string;
+	price: number;
+	category: string;
+	subcategory: string;
+	deliveryTime: number;
+	status: string;
+	userId: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+interface Order {
+	id: string;
+	gigId: string;
+	gigPackageId: string;
+	buyerId: string;
+	sellerId: string;
+	buyerName: string;
+	sellerName: string;
+	amount: number;
+	packageName: string;
+	requirements: string;
+	status: string;
+	orderDate: string;
+	deliveryDate: string;
+	gigTitle: string | null;
+	gigDescription: string | null;
+	packageDescription: string | null;
+	deliveryFiles?: string[];
+	deliveredFiles?: string;
+	payments: any[];
+	review: any;
+	createdAt?: string;
+}
+
+interface UserProfile {
+	userId: string;
+	name: string;
+	email: string;
+	role: string;
+	imageUrl?: string;
+	createdAt: string;
+	accountVerified: boolean;
 }
 
 interface AdminAuthState {
@@ -37,7 +84,10 @@ interface AdminAuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
-    getAllUsers: () => Promise<ProfileResponse[]>;
+  getAllUsers: () => Promise<ProfileResponse[]>;
+  getAllGigs: () => Promise<Gig[]>;
+  getAllOrders: () => Promise<Order[]>;
+  getUserProfile: (userId: string) => Promise<UserProfile>;
 }
 
 export const useAdminAuthStore = create<AdminAuthState>((set) => ({
@@ -121,5 +171,52 @@ getAllUsers: async () => {
 		});
 		throw error;
 	}
+	},
+
+	getAllGigs: async () => {
+		set({ isLoading: true, error: null });
+		try {
+			const response = await axios.get<Gig[]>(`http://localhost:8084/api/gigs`);
+			set({ isLoading: false });
+			return response.data;
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
+			set({
+				error: error.response?.data?.message || "Error fetching gigs",
+				isLoading: false,
+			});
+			throw error;
+		}
+	},
+
+	getAllOrders: async () => {
+		set({ isLoading: true, error: null });
+		try {
+			const response = await axios.get<Order[]>(`http://localhost:8085/api/orders`);
+			console.log('Raw orders response:', response.data);
+			set({ isLoading: false });
+			return response.data;
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
+			set({
+				error: error.response?.data?.message || "Error fetching orders",
+				isLoading: false,
+			});
+			throw error;
+		}
+	},
+
+	getUserProfile: async (userId: string) => {
+		try {
+			console.log(`Fetching user profile for userId: ${userId}`);
+			console.log(`API URL: ${API_URL}/profile/${userId}`);
+			const response = await axios.get<UserProfile>(`${API_URL}/profile/${userId}`);
+			console.log(`User profile response for ${userId}:`, response.data);
+			return response.data;
+		} catch (err: unknown) {
+			const error = err as AxiosError<{ message: string }>;
+			console.error(`Error fetching user profile for ${userId}:`, error.response?.status, error.response?.data);
+			throw new Error(error.response?.data?.message || "Error fetching user profile");
+		}
 	},
 }));

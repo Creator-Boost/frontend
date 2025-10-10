@@ -1,49 +1,75 @@
-import React, { useState } from 'react';
-import { BarChart3, Download, TrendingUp, DollarSign } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BarChart3, Download, TrendingUp, DollarSign, AlertTriangle } from 'lucide-react';
+import { adminReportsService, ReportsData } from '../services/adminReportsService';
 
 const Reports: React.FC = () => {
   const [chartPeriod, setChartPeriod] = useState<'6months' | '1year'>('6months');
+  const [reportsData, setReportsData] = useState<ReportsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const revenueData = {
-    '6months': [
-      { month: 'Aug', revenue: 28400 },
-      { month: 'Sep', revenue: 31200 },
-      { month: 'Oct', revenue: 34800 },
-      { month: 'Nov', revenue: 38900 },
-      { month: 'Dec', revenue: 42300 },
-      { month: 'Jan', revenue: 45600 },
-    ],
-    '1year': [
-      { month: 'Feb', revenue: 22100 },
-      { month: 'Mar', revenue: 24500 },
-      { month: 'Apr', revenue: 26800 },
-      { month: 'May', revenue: 25200 },
-      { month: 'Jun', revenue: 27900 },
-      { month: 'Jul', revenue: 29100 },
-      { month: 'Aug', revenue: 28400 },
-      { month: 'Sep', revenue: 31200 },
-      { month: 'Oct', revenue: 34800 },
-      { month: 'Nov', revenue: 38900 },
-      { month: 'Dec', revenue: 42300 },
-      { month: 'Jan', revenue: 45600 },
-    ],
+  useEffect(() => {
+    fetchReportsData();
+  }, []);
+
+  const fetchReportsData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await adminReportsService.getReportsData();
+      setReportsData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch reports data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const popularServices = [
-    { name: 'Logo Design', bookings: 342, revenue: 51300, growth: '+12%' },
-    { name: 'Web Development', bookings: 156, revenue: 234000, growth: '+8%' },
-    { name: 'Content Writing', bookings: 298, revenue: 25400, growth: '+15%' },
-    { name: 'Social Media Management', bookings: 189, revenue: 84600, growth: '+22%' },
-    { name: 'SEO Services', bookings: 145, revenue: 43500, growth: '+5%' },
-  ];
+  const handleExportCSV = async () => {
+    try {
+      await adminReportsService.exportReportsCSV();
+      alert('CSV exported successfully!');
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+      alert('Failed to export CSV');
+    }
+  };
 
-  const currentData = revenueData[chartPeriod];
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="w-6 h-6 border-b-2 border-blue-600 rounded-full animate-spin"></div>
+        <span className="ml-3 text-gray-600">Loading reports...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <AlertTriangle className="w-5 h-5 text-red-500 mr-2" />
+          <span className="text-red-700">{error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!reportsData) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
+          <span className="text-yellow-700">No reports data available</span>
+        </div>
+      </div>
+    );
+  }
+
+  const currentData = chartPeriod === '6months' 
+    ? reportsData.revenueData6Months 
+    : reportsData.revenueData1Year;
   const maxRevenue = Math.max(...currentData.map(d => d.revenue));
-
-  const handleExportCSV = () => {
-    console.log('Exporting CSV...');
-    // Here you would generate and download a CSV file
-  };
 
   return (
     <div className="space-y-6">
@@ -71,8 +97,15 @@ const Reports: React.FC = () => {
             </div>
             <div>
               <div className="text-sm text-gray-600">Monthly Revenue</div>
-              <div className="text-2xl font-bold text-gray-900">$45,600</div>
-              <div className="text-sm text-green-600 font-medium">+18.2% from last month</div>
+              <div className="text-2xl font-bold text-gray-900">
+                ${reportsData.summary.monthlyRevenue.toLocaleString()}
+              </div>
+              <div className={`text-sm font-medium ${
+                reportsData.summary.monthlyRevenueGrowth >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {reportsData.summary.monthlyRevenueGrowth >= 0 ? '+' : ''}
+                {reportsData.summary.monthlyRevenueGrowth.toFixed(1)}% from last month
+              </div>
             </div>
           </div>
         </div>
@@ -84,8 +117,12 @@ const Reports: React.FC = () => {
             </div>
             <div>
               <div className="text-sm text-gray-600">Commission Earned</div>
-              <div className="text-2xl font-bold text-gray-900">$4,560</div>
-              <div className="text-sm text-blue-600 font-medium">10% commission rate</div>
+              <div className="text-2xl font-bold text-gray-900">
+                ${reportsData.summary.commissionEarned.toLocaleString()}
+              </div>
+              <div className="text-sm text-blue-600 font-medium">
+                {(reportsData.summary.commissionRate * 100).toFixed(0)}% commission rate
+              </div>
             </div>
           </div>
         </div>
@@ -97,8 +134,15 @@ const Reports: React.FC = () => {
             </div>
             <div>
               <div className="text-sm text-gray-600">Avg. Transaction</div>
-              <div className="text-2xl font-bold text-gray-900">$347</div>
-              <div className="text-sm text-purple-600 font-medium">+5.3% vs last month</div>
+              <div className="text-2xl font-bold text-gray-900">
+                ${reportsData.summary.averageTransaction.toLocaleString()}
+              </div>
+              <div className={`text-sm font-medium ${
+                reportsData.summary.averageTransactionGrowth >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {reportsData.summary.averageTransactionGrowth >= 0 ? '+' : ''}
+                {reportsData.summary.averageTransactionGrowth.toFixed(1)}% vs last month
+              </div>
             </div>
           </div>
         </div>
@@ -175,15 +219,20 @@ const Reports: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {popularServices.map((service, index) => (
+              {reportsData.popularServices.map((service, index) => (
                 <tr key={index} className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 px-4 font-medium text-gray-900">{service.name}</td>
+                  <td className="py-3 px-4 font-medium text-gray-900">{service.gigTitle}</td>
                   <td className="py-3 px-4 text-center text-gray-700">{service.bookings}</td>
                   <td className="py-3 px-4 text-center font-medium text-gray-900">
                     ${service.revenue.toLocaleString()}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span className="text-green-600 font-medium">{service.growth}</span>
+                    <span className={`font-medium ${
+                      service.growth.startsWith('+') ? 'text-green-600' : 
+                      service.growth.startsWith('-') ? 'text-red-600' : 'text-gray-600'
+                    }`}>
+                      {service.growth}
+                    </span>
                   </td>
                 </tr>
               ))}

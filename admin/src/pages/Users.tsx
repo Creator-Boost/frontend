@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, MoreHorizontal, Ban, CheckCircle, Trash2, Loader } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Ban, CheckCircle, Trash2, Loader, Star } from 'lucide-react';
 import { useAdminAuthStore } from '../context/useAdminAuthStore';
 
 interface User {
@@ -11,6 +11,8 @@ interface User {
   joinDate: string;
   totalSpent?: string;
   totalEarned?: string;
+  averageRating?: number;
+  totalReviews?: number;
   avatar: string;
 }
 
@@ -22,28 +24,62 @@ const Users: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const getAllUsers = useAdminAuthStore((state) => state.getAllUsers);
+  const getAllOrders = useAdminAuthStore((state) => state.getAllOrders);
+
+  // Calculate expert ratings from orders
+  const calculateExpertRating = (orders: any[], userId: string) => {
+    const expertOrders = orders.filter(order => order.sellerId === userId);
+    const ordersWithReviews = expertOrders.filter(order => 
+      order.review && 
+      order.review.rating && 
+      order.review.reviewText && 
+      order.review.reviewText.trim().length > 0
+    );
+
+    if (ordersWithReviews.length === 0) {
+      return { averageRating: 0, totalReviews: 0 };
+    }
+
+    const totalRating = ordersWithReviews.reduce((sum, order) => sum + order.review.rating, 0);
+    const averageRating = totalRating / ordersWithReviews.length;
+
+    return {
+      averageRating: Math.round(averageRating * 100) / 100,
+      totalReviews: ordersWithReviews.length
+    };
+  };
 
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await getAllUsers();
-        const mappedUsers: User[] = data.map((u) => ({
-          userId: u.userId,
-          name: u.name,
-          email: u.email,
-          role: u.role.toLowerCase(),
-          status: 'active', // default placeholder
-          joinDate: u.createdAt,
-          totalSpent: '$500', // placeholder
-          totalEarned: '$1000', // placeholder
-          avatar: u.imageUrl || u.name
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .toUpperCase(),
-        }));
+        const [usersData, ordersData] = await Promise.all([
+          getAllUsers(),
+          getAllOrders()
+        ]);
+
+        const mappedUsers: User[] = usersData.map((u) => {
+          const { averageRating, totalReviews } = calculateExpertRating(ordersData, u.userId);
+          
+          return {
+            userId: u.userId,
+            name: u.name,
+            email: u.email,
+            role: u.role.toLowerCase(),
+            status: 'active', // default placeholder
+            joinDate: u.createdAt,
+            totalSpent: '$500', // placeholder
+            totalEarned: '$1000', // placeholder
+            averageRating,
+            totalReviews,
+            avatar: u.imageUrl || u.name
+              .split(' ')
+              .map((n) => n[0])
+              .join('')
+              .toUpperCase(),
+          };
+        });
         setUsers(mappedUsers);
       } catch (err) {
         setError('Failed to fetch users');
@@ -138,7 +174,7 @@ const Users: React.FC = () => {
                 <th className="text-left py-3 px-6 font-medium text-gray-900">Role</th>
                 <th className="text-left py-3 px-6 font-medium text-gray-900">Status</th>
                 <th className="text-left py-3 px-6 font-medium text-gray-900">Join Date</th>
-                <th className="text-left py-3 px-6 font-medium text-gray-900">Activity</th>
+                <th className="text-left py-3 px-6 font-medium text-gray-900">Average Rating</th>
                 <th className="text-center py-3 px-6 font-medium text-gray-900">Actions</th>
               </tr>
             </thead>
@@ -171,8 +207,24 @@ const Users: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-4 px-6 text-sm text-gray-600">{new Date(user.joinDate).toLocaleDateString()}</td>
-                  <td className="py-4 px-6 text-sm text-gray-900 font-medium">
-                    {user.role === 'client' ? user.totalSpent : user.totalEarned}
+                  <td className="py-4 px-6">
+                    {user.role === 'provider' ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center">
+                          <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
+                          <span className="text-sm font-medium text-gray-900">
+                            {(user.averageRating && user.averageRating > 0) ? user.averageRating.toFixed(1) : 'No ratings'}
+                          </span>
+                        </div>
+                        {(user.totalReviews && user.totalReviews > 0) && (
+                          <span className="text-xs text-gray-500">
+                            ({user.totalReviews} review{user.totalReviews !== 1 ? 's' : ''})
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-gray-500">N/A</span>
+                    )}
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center justify-center space-x-2">

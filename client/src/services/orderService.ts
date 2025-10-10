@@ -37,13 +37,26 @@ export interface UpdateRequirementsRequest {
   requirements: string;
 }
 
+export interface Dispute {
+  id?: string;
+  title: string;
+  description: string;
+  createdDate?: string;
+  userId: string;
+}
+
+export interface CreateDisputeRequest {
+  title: string;
+  description: string;
+}
+
 export interface Order {
   id: string;
   gigId: string;
   gigPackageId: string;
   buyerId: string;
   sellerId: string;
-  buyerName: string;
+  buyerName?: string; // Added optional buyerName
   sellerName: string;
   amount: number;
   packageName: string;
@@ -57,7 +70,16 @@ export interface Order {
   deliveryFiles?: string[]; // Legacy field for backward compatibility
   deliveredFiles?: string; // Backend field - comma-separated URLs
   payments: any[];
-  review: any;
+  review: {
+    id: string;
+    gigId: string;
+    reviewerId: string;
+    rating: number;
+    reviewText: string;
+    createdAt: string;
+    orderId: string;
+  } | null;
+  disputes?: Dispute[]; // Added disputes array
 }
 
 class OrderService {
@@ -386,6 +408,62 @@ class OrderService {
       hour: '2-digit',
       minute: '2-digit'
     });
+  }
+
+  /**
+   * Add a dispute to an order
+   */
+  async addDispute(orderId: string, disputeData: CreateDisputeRequest): Promise<Dispute> {
+    try {
+      const userId = this.getUserId();
+      const response = await axios.post<Dispute>(`${ORDER_API_URL}/${orderId}/disputes?userId=${userId}`, disputeData, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding dispute:', error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to add dispute';
+        throw new Error(errorMessage);
+      }
+      throw new Error('Failed to add dispute');
+    }
+  }
+
+  /**
+   * Get all disputes for an order
+   */
+  async getDisputesByOrderId(orderId: string): Promise<Dispute[]> {
+    try {
+      const response = await axios.get<Dispute[]>(`${ORDER_API_URL}/${orderId}/disputes`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching disputes:', error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch disputes';
+        throw new Error(errorMessage);
+      }
+      throw new Error('Failed to fetch disputes');
+    }
+  }
+
+  /**
+   * Get order with all disputes included
+   */
+  async getOrderWithDisputes(orderId: string): Promise<Order> {
+    try {
+      const response = await axios.get<Order>(`${ORDER_API_URL}/${orderId}/with-disputes`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching order with disputes:', error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch order with disputes';
+        throw new Error(errorMessage);
+      }
+      throw new Error('Failed to fetch order with disputes');
+    }
   }
 }
 

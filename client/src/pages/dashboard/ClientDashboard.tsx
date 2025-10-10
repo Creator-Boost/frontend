@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Clock, CheckCircle, MessageCircle } from 'lucide-react';
 import OrderList from '../../components/OrderList';
 import UserAvatar from '../../components/UserAvatar';
+import ReviewableOrders from '../../components/ReviewableOrders';
 import { useAuthStore } from '../../context/store/authStore';
 import { orderService, type Order } from '../../services/orderService';
 import { userService, type UserProfile } from '../../services/userService';
@@ -327,6 +328,9 @@ const ClientDashboard: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Reviewable Orders */}
+                <ReviewableOrders />
               </div>
             )}
 

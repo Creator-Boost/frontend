@@ -34,6 +34,8 @@ export interface Gig {
   images: GigImage[];
   packages: GigPackage[];
   faqs: GigFAQ[];
+  averageRating?: number; // New field from backend
+  totalReviews?: number;  // New field from backend
   createdAt?: string;
   updatedAt?: string;
 }
@@ -100,24 +102,7 @@ class GigService {
   }
 
   /**
-   * Get all gigs (for verification purposes)
-   */
-  async getAllGigs(): Promise<Gig[]> {
-    try {
-      const response = await axios.get(API_BASE_URL);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching gigs:', error);
-      if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch gigs';
-        throw new Error(errorMessage);
-      }
-      throw new Error('Failed to fetch gigs');
-    }
-  }
-
-  /**
-   * Get gigs by seller ID
+   * Get gigs by seller ID with review stats
    */
   async getGigsBySeller(sellerId: string): Promise<Gig[]> {
     try {
@@ -134,7 +119,7 @@ class GigService {
   }
 
   /**
-   * Get a specific gig by ID
+   * Get a specific gig by ID with review stats
    */
   async getGigById(gigId: string): Promise<Gig> {
     try {
@@ -157,6 +142,23 @@ class GigService {
         throw new Error(errorMessage);
       }
       throw new Error('Failed to fetch gig');
+    }
+  }
+
+  /**
+   * Get all gigs with review stats
+   */
+  async getAllGigs(): Promise<Gig[]> {
+    try {
+      const response = await axios.get(API_BASE_URL);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching gigs:', error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch gigs';
+        throw new Error(errorMessage);
+      }
+      throw new Error('Failed to fetch gigs');
     }
   }
 

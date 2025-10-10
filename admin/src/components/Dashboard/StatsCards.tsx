@@ -5,24 +5,43 @@ import { useAdminAuthStore } from '../../context/useAdminAuthStore';
 const StatsCards: React.FC = () => {
 
   const getAllUsers = useAdminAuthStore((state) => state.getAllUsers);
+  const getAllGigs = useAdminAuthStore((state) => state.getAllGigs);
+  const getAllOrders = useAdminAuthStore((state) => state.getAllOrders);
+  
   const [totalUsers, setTotalUsers] = useState(0);
+  const [totalServices, setTotalServices] = useState(0);
+  const [totalBookings, setTotalBookings] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchData = async () => {
       try {
+        // Fetch users
         const users = await getAllUsers();
-        setTotalUsers(users.length); // dynamically set total users
+        setTotalUsers(users.length);
+
+        // Fetch gigs (services)
+        const gigs = await getAllGigs();
+        setTotalServices(gigs.length);
+
+        // Fetch orders
+        const orders = await getAllOrders();
+        setTotalBookings(orders.length);
+
+        // Calculate total revenue from orders
+        const revenue = orders.reduce((sum, order) => sum + order.amount, 0);
+        setTotalRevenue(revenue);
       } catch (err) {
-        console.error('Failed to fetch total users', err);
+        console.error('Failed to fetch dashboard data', err);
       }
     };
-    fetchUsers();
-  }, [getAllUsers]);
+    fetchData();
+  }, [getAllUsers, getAllGigs, getAllOrders]);
 
   const stats = [
     {
       title: 'Total Users',
-      value: totalUsers.toLocaleString(), // dynamic value
+      value: totalUsers.toLocaleString(),
       change: '+12.5%',
       changeType: 'positive',
       icon: Users,
@@ -31,7 +50,7 @@ const StatsCards: React.FC = () => {
     },
     {
       title: 'Total Services',
-      value: '3,247',
+      value: totalServices.toLocaleString(),
       change: '+8.2%',
       changeType: 'positive',
       icon: Briefcase,
@@ -40,7 +59,7 @@ const StatsCards: React.FC = () => {
     },
     {
       title: 'Total Bookings',
-      value: '8,956',
+      value: totalBookings.toLocaleString(),
       change: '+15.3%',
       changeType: 'positive',
       icon: Calendar,
@@ -49,7 +68,7 @@ const StatsCards: React.FC = () => {
     },
     {
       title: 'Total Revenue',
-      value: '$247,892',
+      value: `$${totalRevenue.toLocaleString()}`,
       change: '+23.1%',
       changeType: 'positive',
       icon: DollarSign,
