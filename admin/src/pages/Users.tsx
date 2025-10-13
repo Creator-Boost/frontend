@@ -19,38 +19,41 @@ const Users: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const getAllUsers = useAdminAuthStore((state) => state.getAllUsers);
+  const toggleUserSuspension = useAdminAuthStore((state) => state.toggleUserSuspension);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAllUsers();
+      const mappedUsers: User[] = data.map((u) => ({
+        userId: u.userId,
+        name: u.name,
+        email: u.email,
+        role: u.role.toLowerCase(),
+        status: u.suspended ? 'suspended' : 'active', // <-- fix here
+        joinDate: u.createdAt,
+        totalSpent: '$500', // placeholder
+        totalEarned: '$1000', // placeholder
+        avatar: u.imageUrl || u.name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .toUpperCase(),
+      }));
+      setUsers(mappedUsers);
+    } catch (err) {
+      setError('Failed to fetch users');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getAllUsers();
-        const mappedUsers: User[] = data.map((u) => ({
-          userId: u.userId,
-          name: u.name,
-          email: u.email,
-          role: u.role.toLowerCase(),
-          status: 'active', // default placeholder
-          joinDate: u.createdAt,
-          totalSpent: '$500', // placeholder
-          totalEarned: '$1000', // placeholder
-          avatar: u.imageUrl || u.name
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .toUpperCase(),
-        }));
-        setUsers(mappedUsers);
-      } catch (err) {
-        setError('Failed to fetch users');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchUsers();
   }, [getAllUsers]);
 
@@ -60,6 +63,20 @@ const Users: React.FC = () => {
                           user.email.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesRole && matchesSearch;
   });
+
+  const handleSuspendToggle = async (userId: string, suspend: boolean) => {
+    setToggleLoading(userId);
+    try {
+      await toggleUserSuspension(userId, suspend);
+      // Refetch users after toggle to get fresh data
+      await fetchUsers();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update user status");
+    } finally {
+      setToggleLoading(null);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -86,7 +103,14 @@ const Users: React.FC = () => {
   if (error) return <div className="text-red-500">{error}</div>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Small blur overlay when toggling */}
+      {toggleLoading && (
+        <div className="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-10">
+          <Loader className="animate-spin w-10 h-10 text-blue-500" />
+        </div>
+      )}
+
       {/* Header & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -176,15 +200,23 @@ const Users: React.FC = () => {
                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center justify-center space-x-2">
-                      {user.status === 'active' ? (
-                        <button className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Suspend User">
-                          <Ban className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <button className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Activate User">
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
+                      {user.status === "active" ? (
+                          <button
+                            onClick={() => handleSuspendToggle(user.userId, true)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Suspend User"
+                          >
+                            <Ban className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleSuspendToggle(user.userId, false)}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Activate User"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                        )}
                       <button className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete User">
                         <Trash2 className="w-4 h-4" />
                       </button>

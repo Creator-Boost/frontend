@@ -19,6 +19,8 @@ interface ProfileResponse {
     languages: string[];
     skills: string[];
     certifications: string[];
+  approvalRequested?: boolean;
+  approvedByAdmin?: boolean;
   };
   clientProfile?: {
     location: string;
@@ -89,8 +91,10 @@ const ProfilePage: React.FC = () => {
         
         if (isCurrentUserProfile) {
           profile = await getProfile();
+          console.log("Fetched current user profile:", profile);
         } else {
           profile = await getProfileById(id!);
+          console.log("Fetched other user profile:", profile);
         }
         
         setProfileData(profile);
@@ -178,14 +182,6 @@ const ProfilePage: React.FC = () => {
   const handleCancelUpload = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setProfileData(prev => ({
-      ...prev!,
-      [name]: value
-    }));
   };
 
   const handleAddLanguage = () => {
@@ -565,36 +561,103 @@ const ProfilePage: React.FC = () => {
                 </div>
               )}
 
-              {/* Contact/Edit Button */}
-              {isCurrentUserProfile ? (
-                <div className="flex justify-end mb-4">
-                  {isEditing ? (
-                    <button
-                      onClick={handleSaveProfile}
-                      className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold mb-4"
-                    >
-                      <Save className="h-4 w-4" />
-                      Save Profile
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold mb-4"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit Profile
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <button
-                  className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold mb-4"
-                  onClick={handleContactMe}
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  Contact Me
-                </button>
-              )}
+              {/* Contact/Edit Button Section */}
+                {isCurrentUserProfile ? (
+                  <div className="space-y-3 mb-4">
+                    {/* Edit/Save Profile Button */}
+                    <div>
+                      {isEditing ? (
+                        <button
+                          onClick={handleSaveProfile}
+                          className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold transition-colors duration-200"
+                        >
+                          <Save className="h-4 w-4" />
+                          Save Changes
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold transition-colors duration-200"
+                        >
+                          <Edit className="h-4 w-4" />
+                          Edit Profile
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Verification Section */}
+                    {profileData.role === 'PROVIDER' && profileData.providerProfile && !isEditing && (
+                      <div className="space-y-3">
+                        {/* Request Verification Button - Show when not requested and not approved */}
+                        {!profileData.providerProfile.approvalRequested && !profileData.providerProfile.approvedByAdmin && (
+                          <div className="text-center">
+                            <button
+                              onClick={() => navigate('/provider/request-verification')}
+                              className="w-full flex items-center justify-center gap-2 border-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50 py-2 rounded-lg font-medium transition-colors duration-200"
+                            >
+                              <Award className="h-4 w-4" />
+                              Get Verified Account
+                            </button>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Boost your credibility with a verified badge
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Approved - Premium Verified Badge */}
+                        {profileData.providerProfile.approvedByAdmin && (
+                          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 text-center">
+                            <div className="flex items-center justify-center gap-2 text-green-700 mb-1">
+                              <Award className="h-5 w-5" />
+                              <span className="font-semibold">Verified Professional</span>
+                            </div>
+                            <p className="text-xs text-green-600">
+                              ✓ Identity verified • Trusted provider
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Pending Approval Status */}
+                        {profileData.providerProfile.approvalRequested && !profileData.providerProfile.approvedByAdmin && (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                            <div className="flex items-center justify-center gap-2 text-amber-700 mb-1">
+                              <div className="h-3 w-3 bg-amber-500 rounded-full animate-pulse" />
+                              <span className="font-semibold">Verification in Progress</span>
+                            </div>
+                            <p className="text-xs text-amber-600">
+                              Your verification request is being reviewed
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Other User's Profile */
+                    <div className="space-y-3 mb-4">
+                      {/* Contact Button for Other Users */}
+                      <button
+                        className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-semibold transition-colors duration-200"
+                        onClick={handleContactMe}
+                      >
+                        <MessageCircle className="h-5 w-5" />
+                        Contact Me
+                      </button>
+
+                      {/* Show Verified Badge for Other Providers if Approved */}
+                      {profileData.role === 'PROVIDER' && profileData.providerProfile?.approvedByAdmin && (
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center gap-2 text-green-700 mb-1">
+                            <Award className="h-5 w-5" />
+                            <span className="font-semibold">Verified Professional</span>
+                          </div>
+                          <p className="text-xs text-green-600">
+                            ✓ Identity verified • Trusted provider
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                )}
 
               {/* Quick Info */}
               <div className="space-y-3 text-sm">

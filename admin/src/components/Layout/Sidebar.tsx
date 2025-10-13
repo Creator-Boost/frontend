@@ -8,7 +8,8 @@ import {
   AlertTriangle, 
   Settings,
   X,
-  User
+  User,
+  UserCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, isOpen, 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'users', label: 'Users', icon: Users },
+    { id: 'provider-requests', label: 'Provider Requests', icon:  UserCheck},
     { id: 'services', label: 'Services', icon: Briefcase },
     { id: 'bookings', label: 'Bookings', icon: Calendar },
     { id: 'reports', label: 'Reports', icon: BarChart3 },

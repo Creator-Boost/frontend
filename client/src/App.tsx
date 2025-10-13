@@ -14,14 +14,20 @@ import { UserProvider } from './context/UserContext';
 import EmailVerificationPage from './pages/auth/EmailVerificationPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+
+import ProviderRequestVerification from './pages/ProviderRequestVerification';
+
 import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
 import PaymentFailurePage from './pages/payment/PaymentFailurePage';
+
 import { useAuthStore } from './context/store/authStore';
 import { useEffect, useState } from 'react';
 import LoadingScreen from './components/LoadingPage';
 import UsersList from './pages/users';
 import { useChatStore } from './context/store/chatStore';
 import Chatbot from './components/Chatbot';
+import RedirectAuthenticatedUser from './components/auth/RedirectAuthenticatedUser';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 // Wrapper to handle conditional header + chatbot
 function Layout({ children }: { children: React.ReactNode }) {
@@ -70,21 +76,119 @@ function App() {
       <Router>
         <Layout>
           <Routes>
+            {/* Public Pages */}
             <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
             <Route path="/services" element={<ServicesPage />} />
-            <Route path="/expert-dashboard" element={<ExpertDashboard />} />
-            <Route path="/client-dashboard" element={<ClientDashboard />} />
-            <Route path="/profile/:id" element={<ProfilePage />} />
-            <Route path="/messages" element={<MessagesPage />} />
-            <Route path="/service/:id" element={<ServiceDetailPage />} />
-            <Route path="/verify-email" element={<EmailVerificationPage />} />
-            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/users" element={<UsersList />} />
+
+
+            {/* Auth Pages (redirect if already logged in) */}
+            <Route
+              path="/login"
+              element={
+                <RedirectAuthenticatedUser>
+                  <LoginPage />
+                </RedirectAuthenticatedUser>
+              }
+            />
+            <Route
+              path="/signup"
+              element={
+                <RedirectAuthenticatedUser>
+                  <SignupPage />
+                </RedirectAuthenticatedUser>
+              }
+            />
+            <Route
+              path="/forgot-password"
+              element={
+                <RedirectAuthenticatedUser>
+                  <ForgotPasswordPage />
+                </RedirectAuthenticatedUser>
+              }
+            />
+            <Route
+              path="/reset-password/:token"
+              element={
+                <RedirectAuthenticatedUser>
+                  <ResetPasswordPage />
+                </RedirectAuthenticatedUser>
+              }
+            />
+            <Route
+              path="/verify-email"
+              element={
+                <RedirectAuthenticatedUser>
+                  <EmailVerificationPage />
+                </RedirectAuthenticatedUser>
+              }
+            />
+
+            {/* Provider verification request page */}
+            <Route
+              path="/provider/request-verification"
+              element={
+                <ProtectedRoute>
+                  <ProviderRequestVerification />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected Pages (require login) */}
+            <Route
+              path="/expert-dashboard"
+              element={
+                <ProtectedRoute>
+                  <ExpertDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/client-dashboard"
+              element={
+                <ProtectedRoute>
+                  <ClientDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile/:id"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/messages"
+              element={
+                <ProtectedRoute>
+                  <MessagesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/service/:id"
+              element={
+                <ProtectedRoute>
+                  <ServiceDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <UsersList />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Catch-all */}
+            <Route path="*" element={<HomePage />} />
+
             <Route path="/payment/success" element={<PaymentSuccessPage />} />
             <Route path="/payment/failure" element={<PaymentFailurePage />} />
+
           </Routes>
           <Toaster />
         </Layout>
@@ -92,4 +196,5 @@ function App() {
     </UserProvider>
   );
 }
+
 export default App;
