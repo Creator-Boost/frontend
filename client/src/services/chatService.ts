@@ -3,7 +3,8 @@ import SockJS from 'sockjs-client';
 import { Conversation } from '../context/store/chatStore';
 import axios, { AxiosError } from "axios";
 
-const BACKEND_URL = 'http://localhost:8080/api/chat';
+//const BACKEND_URL = 'http://localhost:8080/api/chat';
+const BACKEND_URL = 'http://localhost:8085';
 
 axios.defaults.withCredentials = true;
 
@@ -14,6 +15,7 @@ export interface ChatMessage {
   recipientId: string;
   content: string;
   timestamp: Date;
+  seen?: boolean;
 }
 
 export interface ChatNotification {
@@ -125,6 +127,15 @@ class ChatService {
       const error = err as AxiosError<{ message: string }>;
       console.error('Error fetching conversations:', error.response?.data?.message || error.message);
       return [];
+    }
+  }
+
+  async markMessageAsSeen(messageId: string): Promise<void> {
+    try {
+      await axios.patch(`${BACKEND_URL}/messages/${messageId}/seen`);
+      console.log("Message marked as seen:", messageId);
+    } catch (error) {
+      console.error("Failed to mark message as seen:", error);
     }
   }
 }

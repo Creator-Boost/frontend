@@ -32,6 +32,8 @@ interface ChatState {
   addMessage: (message: ChatMessage) => void;
   startConversation: (participantId: string, participantName: string, participantAvatar: string) => void;
   disconnect: () => void;
+  markMessagesAsSeen: (conversationId: string) => Promise<void>;
+  handleIncomingMessage: (message: ChatMessage) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -51,10 +53,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Fetch previous conversations
       const previousConversations = await chatService.getConversations(userId);
       console.log('Previous conversations:', previousConversations);
-      //set({ conversations: previousConversations });
-      set({ conversations: Array.isArray(previousConversations) ? previousConversations : [] });
-      
-      // Set up message listener
+
+      const conversations: Conversation[] = Array.isArray(previousConversations) ? previousConversations : [];
+      const messagesState: { [key: string]: ChatMessage[] } = {};
+
+      // Load messages for each conversation to calculate unread counts
+      for (const conv of conversations) {
+        const convMessages = await chatService.getChatMessages(userId, conv.participantId);
+        const conversationId = `${userId}_${conv.participantId}`;
+        messagesState[conversationId] = convMessages;
+
+        // Count unread messages for current user
+        const unreadCount = convMessages.filter(msg => !msg.seen && msg.recipientId === userId).length;
+        conv.unreadCount = unreadCount;
+
+        console.log(`Conversation ${conv.participantName} has ${unreadCount} unread messages`);
+      }
+
+      set({ conversations, messages: messagesState });
+
+      // Set up message listener for real-time updates
       chatService.onMessageReceived((notification: ChatNotification) => {
         const newMessage: ChatMessage = {
           id: notification.id,
@@ -65,15 +83,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
           timestamp: new Date(),
         };
         console.log('New message received:', newMessage);
-        
+
         get().addMessage(newMessage);
-        
-        // Update conversation with new message
+
+        // Update conversation with last message and unread count
         const conversations = get().conversations;
         const existingConversation = conversations.find(
           conv => conv.participantId === notification.senderId
         );
-        
+
         if (existingConversation) {
           set({
             conversations: conversations.map(conv =>
@@ -82,16 +100,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...conv,
                     lastMessage: notification.content,
                     lastMessageTime: 'Just now',
-                    unreadCount: conv.id === get().selectedConversation ? 0 : conv.unreadCount + 1,
+                    unreadCount: conv.id === get().selectedConversation ? 0 : (conv.unreadCount || 0) + 1,
                   }
                 : conv
             ),
-            
           });
         }
+
+        // Log updated unread counts for all conversations
+        get().conversations.forEach(conv => {
+          console.log(`Conversation ${conv.participantName} has ${conv.unreadCount} unread messages`);
+        });
       });
+
       console.log('Chat initialized successfully');
-      
       set({ isConnected: true });
     } catch (error) {
       console.error('Failed to initialize chat:', error);
@@ -99,6 +121,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ isLoading: false });
     }
   },
+
 
   selectConversation: (conversationId: string) => {
     set({ selectedConversation: conversationId });
@@ -113,6 +136,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       ),
     });
     console.log('Conversation selected:', conversationId);
+    console.log(`Selected conversation ${conversationId}, unread reset`);
+
+    // also mark all unseen messages as seen
+    useChatStore.getState().markMessagesAsSeen(conversationId);
   },
 
   sendMessage: (recipientId: string, content: string) => {
@@ -140,6 +167,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       recipientId,
       content,
       timestamp: new Date(),
+      
     };
     
     get().addMessage(newMessage);
@@ -162,14 +190,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addMessage: (message: ChatMessage) => {
     const conversationId = message.chatId;
     const currentMessages = get().messages[conversationId] || [];
-    
-    set({
-      messages: {
-        ...get().messages,
-        [conversationId]: [...currentMessages, message],
-      },
+
+    // Add message to local state
+    const updatedMessages = [...currentMessages, message];
+
+    // Update unread count for conversation
+    const conversations = get().conversations;
+    const userId = useAuthStore.getState().user?.userId;
+
+    const updatedConversations = conversations.map(conv => {
+      if (conv.id === conversationId) {
+        const isActive = conv.id === get().selectedConversation;
+        const unreadIncrement = message.recipientId === userId && !isActive ? 1 : 0;
+        return {
+          ...conv,
+          lastMessage: message.content,
+          lastMessageTime: message.timestamp instanceof Date ? message.timestamp.toISOString() : String(message.timestamp),
+          unreadCount: (conv.unreadCount || 0) + unreadIncrement,
+        };
+      }
+      return conv;
     });
-    console.log('Message added to state:', message);
+
+    set({
+      messages: { ...get().messages, [conversationId]: updatedMessages },
+      conversations: updatedConversations,
+    });
+
+    // Log unread counts
+    updatedConversations.forEach(conv => {
+      console.log(`Conversation ${conv.participantName} has ${conv.unreadCount} unread messages`);
+    });
   },
 
   startConversation: (participantId: string, participantName: string, participantAvatar: string) => {
@@ -204,5 +255,61 @@ export const useChatStore = create<ChatState>((set, get) => ({
     chatService.disconnect();
     set({ isConnected: false });
   },
+
+  markMessagesAsSeen: async (conversationId: string) => {
+    const { messages } = get();
+    const conversationMessages = messages[conversationId] || [];
+    const userId = useAuthStore.getState().user?.userId;
+
+    // Find unseen messages (where current user is recipient)
+    const unseenMessages = conversationMessages.filter(
+      (msg) => !msg.seen && msg.recipientId === userId
+    );
+
+    for (const msg of unseenMessages) {
+      await chatService.markMessageAsSeen(msg.id);
+      msg.seen = true; // update local state
+    }
+
+    // Update local store
+    set({
+      messages: {
+        ...messages,
+        [conversationId]: [...conversationMessages],
+      },
+    });
+  },
+
+   handleIncomingMessage: (message: ChatMessage) => {
+    const { messages, selectedConversation, conversations } = get();
+    const chatId = message.chatId;
+
+    const existingMessages = messages[chatId] || [];
+    const updatedMessages = [...existingMessages, message];
+
+    // update messages list
+    const newMessages = { ...messages, [chatId]: updatedMessages };
+    if (selectedConversation === chatId) {
+      chatService.markMessageAsSeen(message.id);
+      message.seen = true;
+    }
+
+    // update conversations list
+    const updatedConversations = conversations.map(conv => {
+      if (conv.id === chatId) {
+        const isActive = selectedConversation === conv.id;
+        return {
+          ...conv,
+          lastMessage: message.content,
+          lastMessageTime: message.timestamp instanceof Date ? message.timestamp.toISOString() : String(message.timestamp),
+          unreadCount: isActive ? 0 : (conv.unreadCount || 0) + 1,
+        };
+      }
+      return conv;
+    });
+
+    set({ messages: newMessages, conversations: updatedConversations });
+  },
+
   
 }));
