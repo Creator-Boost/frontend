@@ -258,20 +258,28 @@ const PendingProviders: React.FC = () => {
                         Admin Status
                       </h4>
                       <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Approval Requested:</span>
-                          <span className={`text-sm font-medium ${selectedProvider.approvalRequested ? 'text-green-500' : 'text-red-500'}`}>
-                            {String(selectedProvider.approvalRequested)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Approved by Admin:</span>
-                          <span className={`text-sm font-medium ${selectedProvider.approvedByAdmin ? 'text-green-500' : 'text-yellow-500'}`}>
-                            {String(selectedProvider.approvedByAdmin)}
-                          </span>
-                        </div>
-                        
-                      </div>
+  <div className="flex justify-between items-center">
+    <span className="text-sm text-gray-600">Approval Status:</span>
+    <span
+      className={`text-sm font-medium ${
+        selectedProvider.approvalRequested ? "text-green-600" : "text-red-500"
+      }`}
+    >
+      {selectedProvider.approvalRequested ? "Request Submitted" : "Not Requested"}
+    </span>
+  </div>
+
+  <div className="flex justify-between items-center">
+    <span className="text-sm text-gray-600">Admin Decision:</span>
+    <span
+      className={`text-sm font-medium ${
+        selectedProvider.approvedByAdmin ? "text-green-600" : "text-yellow-500"
+      }`}
+    >
+      {selectedProvider.approvedByAdmin ? "Approved" : "Pending Review"}
+    </span>
+  </div>
+</div>
                     </div>
                   </div>
                 </div>
