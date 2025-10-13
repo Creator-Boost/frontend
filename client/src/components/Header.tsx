@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Search, MessageCircle } from "lucide-react";
+import { useChatStore } from "../context/store/chatStore";
 import { useAuthStore } from "../context/store/authStore";
 import {
   Navbar,
@@ -17,7 +18,22 @@ import {
 } from "./ui/resizable-navbar";
 
 const Header: React.FC = () => {
-  const { user, isAuthenticated,logout } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
+  const { conversations, initializeChat, isConnected } = useChatStore();
+
+  // compute total unread for logged-in user
+  const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+  useEffect(() => {
+    if (totalUnread > 0) console.log('Total unread messages:', totalUnread);
+  }, [totalUnread]);
+  
+  // Ensure chat is initialized on login/refresh so header unread counts populate
+  useEffect(() => {
+    if (user?.userId && !isConnected) {
+      console.log('Initializing chat from Header for user', user.userId);
+      initializeChat(user.userId).catch(err => console.error('Chat init error from Header:', err));
+    }
+  }, [user?.userId, isConnected, initializeChat]);
   console.log("user", user);
   console.log("isAuthenticated", isAuthenticated);
   
@@ -74,9 +90,14 @@ const Header: React.FC = () => {
 
                 <Link
                   to="/messages"
-                  className="text-gray-700 hover:text-emerald-600 p-2 rounded-md"
+                  className="text-gray-700 hover:text-emerald-600 p-2 rounded-md relative"
                 >
                   <MessageCircle className="h-5 w-5" />
+                  {totalUnread > 0 && (
+                    <span className="absolute -top-1 -right-0.5 bg-emerald-500 text-white rounded-full min-w-[18px] h-5 px-1 flex items-center justify-center text-[10px] font-semibold border-2 border-white">
+                      {totalUnread > 9 ? '9+' : totalUnread}
+                    </span>
+                  )}
                 </Link>
 
                 <div className="relative group">

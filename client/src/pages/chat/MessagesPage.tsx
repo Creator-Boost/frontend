@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Send, Paperclip, MoreVertical, Loader } from 'lucide-react';
 import { useAuthStore } from '../../context/store/authStore';
+import { ChatMessage } from '../../services/chatService';
 import { useChatStore } from '../../context/store/chatStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -32,12 +33,17 @@ const MessagesPage: React.FC = () => {
 
   // Load messages when conversation is selected
   useEffect(() => {
-    if (selectedConversation && user?.userId) {
-      const conversation = conversations.find((conv) => conv.id === selectedConversation);
-      if (conversation) {
-        loadMessages(user.userId, conversation.participantId);
+    const markSeen = async () => {
+      if (selectedConversation && user?.userId) {
+        const conversation = conversations.find((conv) => conv.id === selectedConversation);
+        if (conversation) {
+          const conversationId = `${user.userId}_${conversation.participantId}`;
+          await loadMessages(user.userId, conversation.participantId);
+          await useChatStore.getState().markMessagesAsSeen(conversationId);
+        }
       }
-    }
+    };
+    markSeen();
   }, [selectedConversation, user?.userId, conversations, loadMessages]);
 
   // Scroll to bottom when new messages arrive
@@ -46,6 +52,17 @@ const MessagesPage: React.FC = () => {
   }, [messages, selectedConversation]);
 
   const selectedConversationData = conversations.find((conv) => conv.id === selectedConversation);
+
+  // Type guard to check if an object is a ChatMessage
+  const isChatMessage = (obj: unknown): obj is ChatMessage => {
+    return !!obj && typeof obj === 'object' && typeof (obj as ChatMessage).senderId === 'string';
+  };
+
+  const getTimestampFromLastMessage = (obj: ChatMessage | { content: string; timestamp: string | undefined } | null) => {
+    if (!obj) return undefined;
+    if (isChatMessage(obj)) return obj.timestamp;
+    return (obj as { content: string; timestamp: string | undefined }).timestamp;
+  };
 
   // Sort messages inside conversation
   const conversationMessages = selectedConversation
@@ -166,12 +183,17 @@ const MessagesPage: React.FC = () => {
                     // Find last message from messages state (more reliable than store's lastMessage)
                     const messageKey = `${user?.userId}_${conversation.participantId}`;
                     const convMessages = messages[messageKey] || [];
-                    const lastMessage = convMessages.length > 0
+                    const lastMessageObj = convMessages.length > 0
                         ? convMessages[convMessages.length - 1]
                         : conversation.lastMessage
                         ? { content: conversation.lastMessage, timestamp: conversation.lastMessageTime }
                         : null;
                         
+                    const lastMessageIsMine = isChatMessage(lastMessageObj) && !!user?.userId
+                      ? lastMessageObj.senderId === user.userId
+                      : false;
+                    const lastMessageContent = lastMessageObj ? lastMessageObj.content : null;
+
                     return (
                       <div
                         key={conversation.id}
@@ -195,29 +217,34 @@ const MessagesPage: React.FC = () => {
                             {conversation.online && (
                               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                             )}
+                            {conversation.unreadCount > 0 && (
+                              <div className="absolute -top-1 -right-1 bg-emerald-500 text-white rounded-full min-w-[18px] h-5 px-1 flex items-center justify-center text-[10px] font-semibold border-2 border-white">
+                                {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+                              </div>
+                            )}
                           </div>
                           <div className="ml-3 flex-1 min-w-0">
                             <div className="flex justify-between items-start">
                               <h3 className="text-sm font-medium text-gray-900 truncate">
                                 {conversation.participantName}
                               </h3>
-                              {lastMessage?.timestamp && (
+                              {(getTimestampFromLastMessage(lastMessageObj) || conversation.lastMessageTime) && (
                                 <span className="text-xs text-gray-500">
-                                  {formatMessageTime(lastMessage.timestamp)}
+                                  {formatMessageTime(getTimestampFromLastMessage(lastMessageObj) || conversation.lastMessageTime || '')}
                                 </span>
                               )}
                             </div>
-                            {lastMessage && (
-                              <p className="text-sm text-gray-600 truncate mt-1">
-                                {lastMessage.content}
+                            {lastMessageContent && (
+                              <p className={`text-sm truncate mt-1 ${
+                                conversation.unreadCount > 0 ? 'text-gray-900 font-semibold' : 'text-gray-600'
+                              }`}>
+                                {lastMessageIsMine ? (
+                                  <span className="text-xs text-gray-500 mr-1">You:</span>
+                                ) : null}
+                                <span className="align-baseline">{lastMessageContent}</span>
                               </p>
                             )}
                           </div>
-                          {conversation.unreadCount > 0 && (
-                            <div className="ml-2 bg-emerald-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                              {conversation.unreadCount}
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
@@ -242,7 +269,6 @@ const MessagesPage: React.FC = () => {
                             }
                             alt={selectedConversationData.participantName}
                             className="w-10 h-10 rounded-full object-cover"
-                            
                           />
                           {selectedConversationData.online && (
                             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
@@ -253,7 +279,7 @@ const MessagesPage: React.FC = () => {
                             {selectedConversationData.participantName}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {selectedConversationData.online ? 'Online' : 'Offline'}
+                            {selectedConversationData.online ? 'Online' : selectedConversationData.lastMessageTime ? `Last active ${formatMessageTime(selectedConversationData.lastMessageTime)}` : 'Offline'}
                           </p>
                         </div>
                       </div>
@@ -309,13 +335,14 @@ const MessagesPage: React.FC = () => {
                             >
                               <p className="text-sm">{message.content}</p>
                               <p
-                                className={`text-xs mt-1 ${
-                                  message.senderId === user?.userId
-                                    ? 'text-emerald-100'
-                                    : 'text-gray-500'
+                                className={`text-xs mt-1 flex items-center gap-1 ${
+                                  message.senderId === user?.userId ? 'text-emerald-100' : 'text-gray-500'
                                 }`}
                               >
                                 {formatMessageTime(message.timestamp)}
+                                {message.senderId === user?.userId && message.seen && (
+                                  <span className="ml-1 text-xs">✓ Seen</span>
+                                )}
                               </p>
                             </div>
                           </div>
