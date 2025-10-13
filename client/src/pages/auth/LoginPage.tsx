@@ -5,6 +5,7 @@ import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
 import { useAuthStore } from "../../context/store/authStore";
 import toast from "react-hot-toast";
+import { AxiosError } from "axios";
 
 const LoginPage: React.FC = () => {
   const backendUrl = "http://localhost:8081";
@@ -31,9 +32,18 @@ const LoginPage: React.FC = () => {
         navigate("/");
         toast.success("Login successful!");
       }
-    } catch (error) {
-      console.error("Login error:", error);
-      toast.error("Login failed. Please check your credentials.");
+    } catch (err) {
+      // Check if it's an Axios error and has a backend message
+      const error = err as AxiosError<{ message: string }>;
+      const backendMessage = error.response?.data?.message;
+
+      if (backendMessage === "User account is suspended") {
+        toast.error("Your account has been suspended. Please contact support.");
+      } else if (backendMessage === "Invalid credentials") {
+        toast.error("Invalid email or password.");
+      } else {
+        toast.error(backendMessage || "Login failed. Please try again.");
+      }
     }
   };
 

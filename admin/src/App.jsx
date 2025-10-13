@@ -8,6 +8,7 @@ import Bookings from './pages/Bookings';
 import Reports from './pages/Reports';
 import Disputes from './pages/Disputes';
 import Settings from './pages/Settings';
+import ProviderVerificationRequests from './pages/ProviderVerificationRequests';
 import { Routes, Route } from "react-router-dom";
 import AdminLogin from './pages/AdminLogin';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -22,6 +23,8 @@ function AdminApp() {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
+      case 'provider-requests':
+        return <ProviderVerificationRequests />;
       case 'users':
         return <Users />;
       case 'services':

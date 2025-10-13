@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import axios, { AxiosError } from "axios";
 
-const API_URL = "http://localhost:8080/api/auth";
+//const API_URL = "http://localhost:8080/api/auth";
 
+const API_URL = "http://localhost:8081";
 
 
 axios.defaults.withCredentials = true;
@@ -52,9 +53,15 @@ interface ClientProfile {
   description: string;
 }
 
+interface ProfileNoteResponse {
+  note: string;
+  fileUrl?: string;
+}
+
 interface AuthState {
 	user: User | null;
 	isAuthenticated: boolean;
+	isVerified: boolean; 
 	error: string | null;
 	isLoading: boolean;
 	isCheckingAuth: boolean;
@@ -76,6 +83,8 @@ interface AuthState {
 	getProfile: () => Promise<ProfileResponse>;
 	getAllUsers: () => Promise<ProfileResponse[]>;
 	getProfileById: (userId: string) => Promise<ProfileResponse>;
+	createOrUpdateNote: (providerEmail: string, note: string, file?: File) => Promise<ProfileNoteResponse>;
+	getNoteByProvider: (providerEmail: string) => Promise<ProfileNoteResponse>;
 
 }
 
@@ -186,6 +195,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 				isAuthenticated: true,
 				//user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role, imageUrl: profileResponse.data.imageUrl },
 				error: null,
+				isVerified: profileResponse.data.accountVerified,
 				isLoading: false,
 				
 			});
@@ -211,6 +221,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 				set({
 					user: { email: profileResponse.data.email, name: profileResponse.data.name, userId: profileResponse.data.userId, role: profileResponse.data.role , imageUrl: profileResponse.data.imageUrl },
 					isAuthenticated: true,
+					isVerified: profileResponse.data.accountVerified,
 					isCheckingAuth: false,
 				});
 			} else {
@@ -234,6 +245,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.get<ProfileResponse>(`${API_URL}/profile`);
+			console.log("Profile data:", response.data);
 			set({
 				user: { 
 					email: response.data.email, 
@@ -421,4 +433,49 @@ export const useAuthStore = create<AuthState>((set) => ({
 		throw error;
 	}
 	},
+
+	createOrUpdateNote: async (providerEmail, note, file) => {
+    set({ isLoading: true, error: null });
+    try {
+      const formData = new FormData();
+      formData.append("providerEmail", providerEmail);
+      formData.append("note", note);
+      if (file) formData.append("file", file);
+
+      const response = await axios.post<ProfileNoteResponse>(
+        `${API_URL}/provider/request-note`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      set({ isLoading: false, message: "Note saved successfully" });
+      return response.data;
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message: string }>;
+      set({
+        error: error.response?.data?.message || "Failed to save note",
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  getNoteByProvider: async (providerEmail) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await axios.get<ProfileNoteResponse>(
+        `${API_URL}/provider/note`,
+        { params: { providerEmail } }
+      );
+      set({ isLoading: false });
+      return response.data;
+    } catch (err: unknown) {
+      const error = err as AxiosError<{ message: string }>;
+      set({
+        error: error.response?.data?.message || "Failed to fetch note",
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
 }));
