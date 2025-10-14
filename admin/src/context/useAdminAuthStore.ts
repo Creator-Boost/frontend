@@ -1,11 +1,6 @@
 import { create } from "zustand";
 import axios, { AxiosError } from "axios";
 
-<<<<<<< HEAD
-// const API_URL = "http://localhost:8080/api/auth"; // adjust for API Gateway if needed
-=======
-//const API_URL = "http://localhost:8080/api/auth"; // adjust for API Gateway if needed
->>>>>>> ad5e4b339b164f527b9d42b678ef0c1f4c84d6b5
 const API_URL = "http://localhost:8081";
 axios.defaults.withCredentials = true; // send/receive JWT cookies automatically
 
@@ -29,12 +24,8 @@ interface ProfileResponse {
 	userId: string;
 	imageUrl?: string;
     createdAt: string;
-<<<<<<< HEAD
-}
-=======
     suspended: boolean;
-	
->>>>>>> ad5e4b339b164f527b9d42b678ef0c1f4c84d6b5
+}
 
 interface Gig {
 	id: string;
@@ -108,17 +99,13 @@ interface AdminAuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
-<<<<<<< HEAD
   getAllUsers: () => Promise<ProfileResponse[]>;
   getAllGigs: () => Promise<Gig[]>;
   getAllOrders: () => Promise<Order[]>;
   getUserProfile: (userId: string) => Promise<UserProfile>;
-=======
-    getAllUsers: () => Promise<ProfileResponse[]>;
   toggleUserSuspension: (userId: string, suspend: boolean) => Promise<void>;
   getPendingProviders: () => Promise<ProviderProfile[]>;
   approveProvider: (userId: string) => Promise<void>;
->>>>>>> ad5e4b339b164f527b9d42b678ef0c1f4c84d6b5
 }
 
 export const useAdminAuthStore = create<AdminAuthState>((set) => ({
@@ -204,7 +191,6 @@ getAllUsers: async () => {
 	}
 	},
 
-<<<<<<< HEAD
 	getAllGigs: async () => {
 		set({ isLoading: true, error: null });
 		try {
@@ -251,43 +237,39 @@ getAllUsers: async () => {
 			throw new Error(error.response?.data?.message || "Error fetching user profile");
 		}
 	},
-=======
-toggleUserSuspension: async (userId: string, suspend: boolean) => {
-  try {
-    const response = await axios.put(
-      `${API_URL}/users/${userId}/${suspend ? "suspend" : "activate"}`,
-      {},
-      { withCredentials: true }
-    );
-    console.log("User suspension updated:", response.data);
-  } catch (err) {
-    const error = err as AxiosError<{ message: string }>;
-    throw new Error(error.response?.data?.message || "Failed to update user status");
-  }
-},
 
-getPendingProviders: async () => {
-    try {
-      const res = await axios.get<ProviderProfile[]>(`${API_URL}/providers/pending`);
-      console.log("Pending providers:", res.data);
-      return res.data;
-    } catch (err) {
-      const error = err as AxiosError<{ message: string }>;
-      throw new Error(error.response?.data?.message || "Failed to fetch pending providers");
-    }
-  },
+	toggleUserSuspension: async (userId: string, suspend: boolean) => {
+		try {
+			const response = await axios.put(
+				`${API_URL}/users/${userId}/${suspend ? "suspend" : "activate"}`,
+				{},
+				{ withCredentials: true }
+			);
+			console.log("User suspension updated:", response.data);
+		} catch (err) {
+			const error = err as AxiosError<{ message: string }>;
+			throw new Error(error.response?.data?.message || "Failed to update user status");
+		}
+	},
 
-  // ✅ NEW: approve a provider
-  approveProvider: async (userId: string) => {
-    try {
-      const res = await axios.post(`${API_URL}/providers/${userId}/approve`);
-      
-      console.log(res.data.message);
-    } catch (err) {
-      const error = err as AxiosError<{ message: string }>;
-      throw new Error(error.response?.data?.message || "Failed to approve provider");
-    }
-  },
+	getPendingProviders: async () => {
+		try {
+			const res = await axios.get<ProviderProfile[]>(`${API_URL}/providers/pending`);
+			console.log("Pending providers:", res.data);
+			return res.data;
+		} catch (err) {
+			const error = err as AxiosError<{ message: string }>;
+			throw new Error(error.response?.data?.message || "Failed to fetch pending providers");
+		}
+	},
 
->>>>>>> ad5e4b339b164f527b9d42b678ef0c1f4c84d6b5
+	approveProvider: async (userId: string) => {
+		try {
+			const res = await axios.post(`${API_URL}/providers/${userId}/approve`);
+			console.log(res.data.message);
+		} catch (err) {
+			const error = err as AxiosError<{ message: string }>;
+			throw new Error(error.response?.data?.message || "Failed to approve provider");
+		}
+	},
 }));
