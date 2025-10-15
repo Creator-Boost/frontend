@@ -3,8 +3,9 @@ import axios, { AxiosError } from "axios";
 
 //const API_URL = "http://localhost:8080/api/auth";
 
-const API_URL = "http://localhost:8081";
+ //const API_URL = "https://auth-service-production-8859.up.railway.app";
 
+const API_URL = "http://localhost:8081";
 
 axios.defaults.withCredentials = true;
 
