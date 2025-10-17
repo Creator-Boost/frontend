@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Star, MapPin, Calendar, Upload, X, Award, MessageCircle, Loader, Save, Edit } from 'lucide-react';
+import { Star, MapPin, Calendar, Upload, X, Award, MessageCircle, Loader, Save, Edit, Info } from 'lucide-react';
 import { useAuthStore } from '../context/store/authStore';
 import toast from 'react-hot-toast';
 import { useChatStore } from '../context/store/chatStore';
@@ -76,12 +76,32 @@ const ProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [profileData, setProfileData] = useState<ProfileResponse | null>(null);
+  const [showBanner, setShowBanner] = useState<boolean>(true);
   const [newLanguage, setNewLanguage] = useState('');
   const [newSkill, setNewSkill] = useState('');
   const [newCertification, setNewCertification] = useState('');
   const navigate = useNavigate();
 
   const isCurrentUserProfile = user?.userId === id;
+
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem('profile_update_banner_dismissed') === 'true';
+      setShowBanner(!dismissed);
+    } catch {
+      // ignore (e.g., SSR or localStorage not available)
+      setShowBanner(true);
+    }
+  }, []);
+
+  const handleDismissBanner = () => {
+    try {
+      localStorage.setItem('profile_update_banner_dismissed', 'true');
+    } catch {
+      // ignore
+    }
+    setShowBanner(false);
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -427,6 +447,29 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Dismissible banner for prompting profile updates (shown to profile owner) */}
+      {isCurrentUserProfile && showBanner && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-md shadow-sm flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <div className="text-green-800 font-semibold flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  Update Required
+                </div>
+                <div className="text-green-700 items-end text-right">
+                  Your profile is almost complete — update your details to unlock the next steps and enjoy a smoother experience.
+                </div>
+              </div>
+              <button
+                aria-label="Dismiss banner"
+                onClick={handleDismissBanner}
+                className="text-green-700 hover:text-green-900 ml-4"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Profile Info */}
